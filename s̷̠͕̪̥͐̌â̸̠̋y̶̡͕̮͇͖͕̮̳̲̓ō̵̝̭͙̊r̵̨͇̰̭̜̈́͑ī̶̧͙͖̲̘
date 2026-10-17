@@ -253,7 +253,7 @@ function utils.formatWithCommas(n, formatted, separatorCount)
     return formatted
 end
 
-function utils. greeting(hour)
+function utils.greeting(hour)
     hour = hour or os.date("*t").hour
     if hour >= 6 and hour < 12 then return "Good Morning!"
     elseif hour >= 12 and hour < 13 then return "Good Noon!"
@@ -569,7 +569,7 @@ tabs.fullFarm.lastCalculationAt = tick()
 tabs.fullFarm.lastCalculatedStrength = tabs.fullFarm.strength.Value
 tabs.fullFarm.lastCalculatedDurability = tabs.fullFarm.durability.Value
 tabs.fullFarm.initialSendRate = 200
-tabs.fullFarm.maxSendRate = 659
+tabs.fullFarm.maxSendRate = 640
 tabs.fullFarm.sendRate = tabs.fullFarm.initialSendRate
 tabs.fullFarm.sendTokens = 0
 tabs.fullFarm.maxBurst = 24
@@ -1524,7 +1524,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: QUESTS & EXTRAS
+-- TAB: QUESTS & EXTRAS (INTEGRADO CORRECTAMENTE)
 -- ==========================================
 tabs.misiones:AddLabel("QUESTS")
 tabs.misiones.AutoQuestActive = false
@@ -1532,57 +1532,23 @@ tabs.misiones:AddSwitch("Auto Collect Quests", function(state)
     tabs.misiones.AutoQuestActive = state
     if state then
         task.spawn(function()
-            local function processQuestsContainer(container)
-                for _, child in ipairs(container:GetChildren()) do
-                    if child.Name ~= "completedQuests" then
-                        if child:IsA("Folder") or child:IsA("Model") then
-                            processQuestsContainer(child)
-                        else
-                            pcall(function()
-                                local questsEvent = services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("questsEvent")
-                                local parentName = container.Name
-                                local grandParentName = container.Parent and container.Parent.Name or ""
-                                if parentName == "Enchant Quests" or grandParentName == "Enchant Quests" then
-                                    questsEvent:FireServer("collectEnchantQuest", child)
-                                    questsEvent:FireServer("collectEnchantQuest", child.Name)
-                                elseif parentName == "Daily Quests" or grandParentName == "Daily Quests" then
-                                    questsEvent:FireServer("collectDailyQuest", child)
-                                    questsEvent:FireServer("collectDailyQuest", child.Name)
-                                    questsEvent:FireServer("collectQuest", child)
-                                    questsEvent:FireServer("collectQuest", child.Name)
-                                else
-                                    questsEvent:FireServer("collectQuest", child)
-                                    questsEvent:FireServer("collectQuest", child.Name)
-                                end
-                            end)
-                        end
-                    end
-                end
-            end
             while tabs.misiones.AutoQuestActive and utils.isCurrent() do
                 pcall(function()
-                    local questsFolder = lp.player:FindFirstChild("Quests")
-                    if questsFolder then
-                        processQuestsContainer(questsFolder)
-                    else
-                        for _, folder in pairs(lp.player:GetChildren()) do
-                            if folder:IsA("Folder") and string.find(string.lower(folder.Name), "quest") then
-                                processQuestsContainer(folder)
-                            end
-                        end
-                    end
-                    if getnilinstances then
-                        for _, obj in ipairs(getnilinstances()) do
-                            pcall(function()
-                                local parent = obj.Parent
-                                local parentName = parent and parent.Name or ""
-                                if parentName == "Daily Quests" or parentName == "Enchant Quests" or parentName == "Quests" or obj.Name == "Mighty Fists" or obj.Name == "Rep Sensei" or obj.Name == "Rebirth Wizard" then
-                                    local questsEvent = services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("questsEvent")
-                                    questsEvent:FireServer("collectQuest", obj)
-                                    questsEvent:FireServer("collectDailyQuest", obj)
-                                    questsEvent:FireServer("collectEnchantQuest", obj)
+                    local rEvents = services.ReplicatedStorage:FindFirstChild("rEvents")
+                    local questsEvent = rEvents and rEvents:FindFirstChild("questsEvent")
+                    if questsEvent then
+                        local questsFolder = lp.player:FindFirstChild("Quests")
+                        if questsFolder then
+                            for _, child in ipairs(questsFolder:GetChildren()) do
+                                if child.Name ~= "completedQuests" then
+                                    questsEvent:FireServer("collectQuest", child)
+                                    questsEvent:FireServer("collectQuest", child.Name)
+                                    questsEvent:FireServer("collectDailyQuest", child)
+                                    questsEvent:FireServer("collectDailyQuest", child.Name)
+                                    questsEvent:FireServer("collectEnchantQuest", child)
+                                    questsEvent:FireServer("collectEnchantQuest", child.Name)
                                 end
-                            end)
+                            end
                         end
                     end
                 end)
