@@ -36,7 +36,7 @@ if not verified then
     end)
 end
 
--- 3. Mostrar Interfaz si no está verificado
+-- 3. Mostrar Interfaz si no está verificado (Optimizado para Móviles)
 if not verified then
     local screenGui = Instance.new("ScreenGui")
     screenGui.Name = "Proyectados Hub"
@@ -45,13 +45,19 @@ if not verified then
 
     local mainFrame = Instance.new("Frame")
     mainFrame.Name = "MainFrame"
-    mainFrame.Size = UDim2.new(0, 380, 0, 290)
-    mainFrame.Position = UDim2.new(0.5, -190, 0.5, -145)
+    mainFrame.Size = UDim2.new(0.85, 0, 0.6, 0)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
     mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
     mainFrame.BorderSizePixel = 0
     mainFrame.Active = true
     mainFrame.Draggable = true
     mainFrame.Parent = screenGui
+
+    local sizeConstraint = Instance.new("UISizeConstraint")
+    sizeConstraint.MaxSize = Vector2.new(380, 290)
+    sizeConstraint.MinSize = Vector2.new(280, 220)
+    sizeConstraint.Parent = mainFrame
 
     local uiCorner = Instance.new("UICorner")
     uiCorner.CornerRadius = UDim.new(0, 10)
@@ -83,8 +89,9 @@ if not verified then
     subTitle.Parent = mainFrame
 
     local textBox = Instance.new("TextBox")
-    textBox.Size = UDim2.new(0, 320, 0, 42)
-    textBox.Position = UDim2.new(0.5, -160, 0.33, 0)
+    textBox.Size = UDim2.new(0.85, 0, 0, 42)
+    textBox.Position = UDim2.new(0.5, 0, 0.33, 0)
+    textBox.AnchorPoint = Vector2.new(0.5, 0)
     textBox.PlaceholderText = "Escribe La Key aquí..."
     textBox.Text = ""
     textBox.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
@@ -99,8 +106,9 @@ if not verified then
     tbCorner.Parent = textBox
 
     local submitButton = Instance.new("TextButton")
-    submitButton.Size = UDim2.new(0, 320, 0, 42)
-    submitButton.Position = UDim2.new(0.5, -160, 0.53, 0)
+    submitButton.Size = UDim2.new(0.85, 0, 0, 42)
+    submitButton.Position = UDim2.new(0.5, 0, 0.53, 0)
+    submitButton.AnchorPoint = Vector2.new(0.5, 0)
     submitButton.Text = "Verificar Key"
     submitButton.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
     submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -113,8 +121,9 @@ if not verified then
     btnCorner.Parent = submitButton
 
     local discordButton = Instance.new("TextButton")
-    discordButton.Size = UDim2.new(0, 320, 0, 42)
-    discordButton.Position = UDim2.new(0.5, -160, 0.73, 0)
+    discordButton.Size = UDim2.new(0.85, 0, 0, 42)
+    discordButton.Position = UDim2.new(0.5, 0, 0.73, 0)
+    discordButton.AnchorPoint = Vector2.new(0.5, 0)
     discordButton.Text = "DISCORD"
     discordButton.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
     discordButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -140,7 +149,6 @@ if not verified then
     submitButton.MouseButton1Click:Connect(function()
         if textBox.Text == correctKey then
             verified = true
-            -- Guardar la Key
             pcall(function()
                 if writefile then
                     writefile(keyFileName, correctKey)
@@ -251,15 +259,6 @@ function utils.formatWithCommas(n, formatted, separatorCount)
         if separatorCount == 0 then break end
     end
     return formatted
-end
-
-function utils.greeting(hour)
-    hour = hour or os.date("*t").hour
-    if hour >= 6 and hour < 12 then return "Good Morning!"
-    elseif hour >= 12 and hour < 13 then return "Good Noon!"
-    elseif hour >= 13 and hour < 19 then return "Good Afternoon!"
-    elseif hour >= 19 and hour < 22 then return "Good Evening!"
-    else return "Good Night!" end
 end
 
 function utils.deleteAds()
@@ -424,7 +423,7 @@ local tabs = {
     fullRebirth = utils.ProyectadosHub:AddTab("Auto Rebirth"),
     configs = utils.ProyectadosHub:AddTab("Zones"),
     boss = utils.ProyectadosHub:AddTab("Bosses"),
-    clips = utils.ProyectadosHub:AddTab("Combat / PvP"),
+    clips = utils.ProyectadosHub:AddTab("PvP"),
     misiones = utils.ProyectadosHub:AddTab("Quests & Extras"),
     other = utils.ProyectadosHub:AddTab("Utilities"),
     info = utils.ProyectadosHub:AddTab("Info")
@@ -504,7 +503,7 @@ tabs.farming.RockData = {
 tabs.farming.RockDropdown = tabs.farming:AddDropdown("Select Rock", function(selection) tabs.farming.RockData.SelectedRock = selection end)
 for rockName in pairs(tabs.farming.RockData.Data) do tabs.farming.RockDropdown:Add(rockName) end
 
-tabs.farming:AddSwitch("Auto Rock", function(enabled)
+tabs.farming.RockFarmToggle = tabs.farming:AddSwitch("Auto Rock", function(enabled)
     getgenv().RockFarmRunning = enabled
     if enabled and tabs.farming.RockData.SelectedRock then
         task.spawn(function()
@@ -550,7 +549,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (SILENCE ENGINE + PROYECTADOS CALCULATOR)
+-- TAB: FAST FARM
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -585,7 +584,6 @@ tabs.fullFarm.lastCalculationAt = tick()
 tabs.fullFarm.lastCalculatedStrength = tabs.fullFarm.strength.Value
 tabs.fullFarm.lastCalculatedDurability = tabs.fullFarm.durability.Value
 
--- UI LABELS
 tabs.fullFarm.Status = tabs.fullFarm:AddLabel("Status: Inactive")
 tabs.fullFarm.Runtime = tabs.fullFarm:AddLabel("Runtime: 0d 0h 0m 0s")
 tabs.fullFarm.StrengthStats = tabs.fullFarm:AddLabel("Strength: " .. formatCurrentStat(tabs.fullFarm.strength.Value) .. " | Gained: 0")
@@ -596,7 +594,6 @@ tabs.fullFarm.StrengthAverage = tabs.fullFarm:AddLabel("Str Ø: --/s | --/min | 
 tabs.fullFarm.DurabilityAverage = tabs.fullFarm:AddLabel("Dura Ø: --/s | --/min | --/h | --/d | --/w")
 tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 
--- FUNCIONES BASE (SILENCE)
 local function getElapsed(tab)
     return tab.totalElapsed + (tab.timerStarted and os.clock() - tab.startedAt or 0)
 end
@@ -629,7 +626,6 @@ local function sendTrainingReps(state, rate, maxBurst, canSend)
     return sent
 end
 
--- ACTUALIZACIÓN UI (PROYECTADOS + SILENCE)
 tabs.fullFarm.updateRuntime = function()
     local elapsed = getElapsed(tabs.fullFarm)
     tabs.fullFarm.Runtime.Text = string.format("Runtime: %dd %dh %dm %ds",
@@ -665,7 +661,6 @@ tabs.fullFarm.calculatePaceAndAverage = function()
     end
 end
 
--- MOTOR ADAPTATIVO (SILENCE)
 tabs.fullFarm.updateAdaptiveRate = function()
     tabs.fullFarm.controlNow = tick()
     tabs.fullFarm.controlElapsed = tabs.fullFarm.controlNow - tabs.fullFarm.lastControlAt
@@ -792,7 +787,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: AUTO REBIRTH (DINÁMICO + HEARTBEAT)
+-- TAB: AUTO REBIRTH
 -- ==========================================
 tabs.fullRebirth:AddLabel("GOALS")
 tabs.fullRebirth.TargetRebirths = 0
@@ -845,7 +840,6 @@ tabs.fullRebirth.FastRebirthV2Data.Rebirths:GetPropertyChangedSignal("Value"):Co
 end)
 tabs.fullRebirth.updateRebirthStats()
 
--- 1. Base de datos de mascotas (Gratis, Jefes y Premium)
 tabs.fullRebirth.PetDatabase = {
     ["Omega Overlord"] = { speed = 20, str = 0, reb = 0 },
     ["Swift Samurai"] = { speed = 15, str = 0, reb = 0 },
@@ -862,7 +856,6 @@ tabs.fullRebirth.PetDatabase = {
     ["Common Boss Pet"] = { speed = 5, str = 0, reb = 0 }
 }
 
--- 2. Motor de Equipamiento Matemático
 tabs.fullRebirth.equipDynamicPets = function(mode, maxPets)
     maxPets = maxPets or 12
     local ownedPets = {}
@@ -925,7 +918,6 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
             break
         end
         
-        -- FASE 1: FARMEAR (Velocidad)
         if data.UseFarmPets then
             tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Equipping best speed pets..."
             tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
@@ -940,7 +932,6 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
         tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Farming... " .. utils.formatNumber(data.Strength.Value) .. " / " .. utils.formatNumber(targetStrength)
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         
-        -- Bucle vinculado al Heartbeat
         while utils.isCurrent() and data.Running and data.Strength.Value < targetStrength do
             for i = 1, repsPerBurst do
                 pcall(function() utils.remotes.MuscleEvent:FireServer("rep") end)
@@ -950,7 +941,6 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
         
         if utils.isCurrent() and data.Running and data.Strength.Value >= targetStrength then
             
-            -- FASE 2: RENACIMIENTO (Multiplicadores)
             if data.UsePackPets then
                 tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Equipping best rebirth pets..."
                 tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 150, 255)
@@ -970,7 +960,6 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
                 data.LastRebirthTime = tick()
             end
             
-            -- FASE 3: POST-RENACIMIENTO / COMBATE (Fuerza/Golems)
             if data.UseGolems then
                 tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Re-equipping combat pets..."
                 tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(150, 200, 255)
@@ -1199,8 +1188,7 @@ end):Set(false)
 tabs.boss.NormalData = {
     Running = false,
     Generation = 0,
-    TargetBoss = "Todos",
-    HitInterval = 0.03,
+    HitInterval = 0.01,
     NormalBosses = {}
 }
 
@@ -1208,11 +1196,62 @@ tabs.boss.HalloweenData = {
     Running = false,
     Generation = 0,
     TargetBoss = "Todos",
-    HitInterval = 0.03,
+    HitInterval = 0.01,
     HalloweenBosses = {}
 }
 
 local halloweenBossNames = {"Frankenbrute", "Scarecrow Colossus", "Grim Reaper", "Pumpkin Titan"}
+
+tabs.boss:AddLabel("AUTO CHEST SYSTEM")
+
+tabs.boss.AutoChestData = {
+    Running = false,
+    TargetPos = Vector3.new(-10, 37, -1252)
+}
+
+tabs.boss:AddSwitch("Auto Chest", function(state)
+    tabs.boss.AutoChestData.Running = state
+    
+    if state then
+        task.spawn(function()
+            while utils.isCurrent() and tabs.boss.AutoChestData.Running do
+                pcall(function()
+                    local bossDead = false
+                    
+                    for _, candidate in ipairs(services.CollectionService:GetTagged("BossEventBoss")) do
+                        if candidate:IsA("Model") and candidate:IsDescendantOf(services.Workspace) then
+                            local health, _, _ = tabs.boss.getBossData(candidate)
+                            if health and health <= 0 then
+                                bossDead = true
+                                break
+                            end
+                        end
+                    end
+                    
+                    if not bossDead then
+                        for _, bossName in ipairs(halloweenBossNames) do
+                            local candidate = services.Workspace:FindFirstChild(bossName)
+                            if candidate and candidate:IsA("Model") then
+                                local health, _, _ = tabs.boss.getBossData(candidate)
+                                if health and health <= 0 then
+                                    bossDead = true
+                                    break
+                                end
+                            end
+                        end
+                    end
+
+                    if bossDead then
+                        task.wait(2)
+                        utils.tpE(tabs.boss.AutoChestData.TargetPos)
+                        task.wait(3)
+                    end
+                end)
+                task.wait(0.5)
+            end
+        end)
+    end
+end)
 
 tabs.boss:AddLabel("GENERAL STATUS")
 tabs.boss.StatusLabel = tabs.boss:AddLabel("Status: Inactive")
@@ -1228,9 +1267,7 @@ tabs.boss.getBossData = function(bossModel)
     return health, maxHealth, hitbox
 end
 
--- ==========================================
 -- 1. SECTION: NORMAL BOSSES
--- ==========================================
 tabs.boss:AddLabel("NORMAL BOSSES")
 
 tabs.boss.findNormalBoss = function()
@@ -1238,10 +1275,8 @@ tabs.boss.findNormalBoss = function()
         if candidate:IsA("Model") and candidate:IsDescendantOf(services.Workspace) then
             local bossName = candidate:GetAttribute("BossDisplayName") or candidate.Name
             tabs.boss.addNormalBossChoice(bossName)
-            if tabs.boss.NormalData.TargetBoss == "Todos" or tabs.boss.NormalData.TargetBoss == bossName then
-                local health, maxHealth, hitbox = tabs.boss.getBossData(candidate)
-                if hitbox then return candidate, bossName, health, maxHealth, hitbox end
-            end
+            local health, maxHealth, hitbox = tabs.boss.getBossData(candidate)
+            if hitbox then return candidate, bossName, health, maxHealth, hitbox end
         end
     end
     local arena = services.Workspace:FindFirstChild("Events") and services.Workspace.Events:FindFirstChild("BossArena")
@@ -1249,7 +1284,7 @@ tabs.boss.findNormalBoss = function()
         for _, candidate in ipairs(arena:GetChildren()) do
             if candidate:IsA("Model") then
                 local bossName = candidate:GetAttribute("BossDisplayName") or candidate.Name
-                if candidate:GetAttribute("BossRarityIndex") ~= nil and (tabs.boss.NormalData.TargetBoss == "Todos" or tabs.boss.NormalData.TargetBoss == bossName) then
+                if candidate:GetAttribute("BossRarityIndex") ~= nil then
                     local health, maxHealth, hitbox = tabs.boss.getBossData(candidate)
                     if hitbox then return candidate, bossName, health, maxHealth, hitbox end
                 end
@@ -1259,16 +1294,10 @@ tabs.boss.findNormalBoss = function()
     return nil
 end
 
-tabs.boss.NormalDropdown = tabs.boss:AddDropdown("Select Normal Boss", function(selectedName)
-    if selectedName ~= "" then tabs.boss.NormalData.TargetBoss = selectedName end
-end)
-tabs.boss.NormalDropdown:Add("Todos")
-
 tabs.boss.addNormalBossChoice = function(name)
     name = tostring(name or "")
     if name ~= "" and not tabs.boss.NormalData.NormalBosses[name] then
         tabs.boss.NormalData.NormalBosses[name] = true
-        tabs.boss.NormalDropdown:Add(name)
     end
 end
 
@@ -1279,18 +1308,9 @@ pcall(function()
     end
 end)
 
-local normalSpeedDropdown = tabs.boss:AddDropdown("Normal Attack Speed", function(selected)
-    if selected == "Max" then tabs.boss.NormalData.HitInterval = 0.01
-    elseif selected == "Fast" then tabs.boss.NormalData.HitInterval = 0.03
-    elseif selected == "Normal" then tabs.boss.NormalData.HitInterval = 0.06
-    elseif selected == "Slow" then tabs.boss.NormalData.HitInterval = 0.12 end
-end)
-normalSpeedDropdown:Add("Max")
-normalSpeedDropdown:Add("Fast")
-normalSpeedDropdown:Add("Normal")
-normalSpeedDropdown:Add("Slow")
+local normalBossSwitchRef = nil
 
-tabs.boss:AddSwitch("Auto Farm Normal Boss", function(state)
+normalBossSwitchRef = tabs.boss:AddSwitch("Auto Farm Normal Boss", function(state)
     tabs.boss.NormalData.Running = state
     tabs.boss.NormalData.Generation = tabs.boss.NormalData.Generation + 1
     local gen = tabs.boss.NormalData.Generation
@@ -1311,10 +1331,13 @@ tabs.boss:AddSwitch("Auto Farm Normal Boss", function(state)
     end
 
     task.spawn(function()
+        local hadBoss = false
         while utils.isCurrent() and tabs.boss.NormalData.Running and tabs.boss.NormalData.Generation == gen do
+            local killed = false
             pcall(function()
                 local model, bossName, health, maxHealth, hitbox = tabs.boss.findNormalBoss()
                 if model and hitbox then
+                    hadBoss = true
                     tabs.boss.StatusLabel.Text = "Status: Fighting Normal Boss"
                     tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
                     tabs.boss.BossLabel.Text = "Boss: " .. bossName
@@ -1323,6 +1346,11 @@ tabs.boss:AddSwitch("Auto Farm Normal Boss", function(state)
                     else
                         tabs.boss.HealthLabel.Text = "Health: Active"
                     end
+                    
+                    if health and health <= 0 then
+                        killed = true
+                    end
+
                     hitbox.Size = Vector3.new(60, 120, 60)
                     hitbox.Transparency = 1
                     hitbox.CanCollide = false
@@ -1333,8 +1361,16 @@ tabs.boss:AddSwitch("Auto Farm Normal Boss", function(state)
                     if hrp then
                         if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
                         local alturaDinamica = (hitbox.Size.Y / 2) + 15
-                        hrp.CFrame = CFrame.lookAt(hitbox.Position + Vector3.new(0, alturaDinamica, 0), hitbox.Position)
+                        
+                        local velocidadOrbita = tick() * 3
+                        local radioEvasion = 12
+                        local offsetX = math.cos(velocidadOrbita) * radioEvasion
+                        local offsetZ = math.sin(velocidadOrbita) * radioEvasion
+                        local offsetSeguro = Vector3.new(offsetX, alturaDinamica, offsetZ)
+                        
+                        hrp.CFrame = CFrame.lookAt(hitbox.Position + offsetSeguro, hitbox.Position)
                         hrp.AssemblyLinearVelocity = Vector3.zero
+                        
                         if utils.remotes.MuscleEvent then
                             utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
                             utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
@@ -1342,20 +1378,37 @@ tabs.boss:AddSwitch("Auto Farm Normal Boss", function(state)
                         if punch then punch:Activate() end
                     end
                 else
-                    tabs.boss.StatusLabel.Text = "Status: Waiting Normal Boss"
-                    tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
-                    tabs.boss.BossLabel.Text = "Boss: None"
-                    tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+                    if hadBoss then
+                        killed = true
+                    else
+                        tabs.boss.StatusLabel.Text = "Status: Waiting Normal Boss"
+                        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
+                        tabs.boss.BossLabel.Text = "Boss: None"
+                        tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+                    end
                 end
             end)
+
+            if killed then
+                if normalBossSwitchRef and normalBossSwitchRef.Set then
+                    normalBossSwitchRef:Set(false)
+                else
+                    tabs.boss.NormalData.Running = false
+                end
+                
+                pcall(function()
+                    utils.tpE(Vector3.new(-1, 66, -1249))
+                end)
+                
+                break
+            end
+
             task.wait(tabs.boss.NormalData.HitInterval)
         end
     end)
 end)
 
--- ==========================================
 -- 2. SECTION: HALLOWEEN BOSSES
--- ==========================================
 tabs.boss:AddLabel("HALLOWEEN BOSSES")
 
 tabs.boss.findHalloweenBoss = function()
@@ -1380,18 +1433,7 @@ for _, name in ipairs(halloweenBossNames) do
     tabs.boss.HalloweenDropdown:Add(name)
 end
 
-local halloweenSpeedDropdown = tabs.boss:AddDropdown("Halloween Attack Speed", function(selected)
-    if selected == "Max" then tabs.boss.HalloweenData.HitInterval = 0.01
-    elseif selected == "Fast" then tabs.boss.HalloweenData.HitInterval = 0.03
-    elseif selected == "Normal" then tabs.boss.HalloweenData.HitInterval = 0.06
-    elseif selected == "Slow" then tabs.boss.HalloweenData.HitInterval = 0.12 end
-end)
-halloweenSpeedDropdown:Add("Max")
-halloweenSpeedDropdown:Add("Fast")
-halloweenSpeedDropdown:Add("Normal")
-halloweenSpeedDropdown:Add("Slow")
-
-tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
+tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
     tabs.boss.HalloweenData.Running = state
     tabs.boss.HalloweenData.Generation = tabs.boss.HalloweenData.Generation + 1
     local gen = tabs.boss.HalloweenData.Generation
@@ -1434,8 +1476,16 @@ tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
                     if hrp then
                         if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
                         local alturaDinamica = (hitbox.Size.Y / 2) + 15
-                        hrp.CFrame = CFrame.lookAt(hitbox.Position + Vector3.new(0, alturaDinamica, 0), hitbox.Position)
+                        
+                        local velocidadOrbita = tick() * 3
+                        local radioEvasion = 12
+                        local offsetX = math.cos(velocidadOrbita) * radioEvasion
+                        local offsetZ = math.sin(velocidadOrbita) * radioEvasion
+                        local offsetSeguro = Vector3.new(offsetX, alturaDinamica, offsetZ)
+                        
+                        hrp.CFrame = CFrame.lookAt(hitbox.Position + offsetSeguro, hitbox.Position)
                         hrp.AssemblyLinearVelocity = Vector3.zero
+                        
                         if utils.remotes.MuscleEvent then
                             utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
                             utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
@@ -1454,37 +1504,6 @@ tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
     end)
 end)
 
--- ==========================================
--- 3. REWARDS
--- ==========================================
-tabs.boss:AddLabel("REWARDS")
-tabs.boss:AddSwitch("Auto Open Chest", function(state)
-    tabs.boss.ChestRunning = state
-    if state then
-        task.spawn(function()
-            while utils.isCurrent() and tabs.boss.ChestRunning do
-                pcall(function()
-                    local char = lp.player.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    if hrp and firetouchinterest then
-                        for _, part in ipairs(services.Workspace:GetDescendants()) do
-                            if part:IsA("BasePart") and part:FindFirstChild("TouchInterest") then
-                                local pName = part.Parent and string.lower(part.Parent.Name) or ""
-                                local cName = string.lower(part.Name)
-                                if string.find(pName, "chest") or string.find(cName, "chest") or string.find(pName, "reward") then
-                                    firetouchinterest(hrp, part, 0)
-                                    firetouchinterest(hrp, part, 1)
-                                end
-                            end
-                        end
-                    end
-                end)
-                task.wait(1.5)
-            end
-        end)
-    end
-end)
-
 pcall(function()
     if utils.remotes.GuiDamageEvent then
         utils.connect(utils.remotes.GuiDamageEvent.OnClientEvent, function(action, _, damage, targetModel, _)
@@ -1499,7 +1518,7 @@ pcall(function()
 end)
 
 -- ==========================================
--- TAB: COMBAT / PVP
+-- TAB: PvP
 -- ==========================================
 tabs.clips:AddLabel("KILL AURA (DEATH RING)")
 local AuraConfig = { Enabled = false, Range = 20, RingPart = nil }
@@ -1530,7 +1549,7 @@ local function updateRing()
     AuraConfig.RingPart.Parent = services.Workspace
 end
 
-tabs.clips:AddSwitch("Toggle Kill Aura", function(state)
+AuraConfig.Toggle = tabs.clips:AddSwitch("Toggle Kill Aura", function(state)
     AuraConfig.Enabled = state
     updateRing()
     
@@ -1744,25 +1763,64 @@ end):Set(true)
 
 tabs.other:AddButton("Anti Lag", function()
     pcall(function()
-        for _, gui in pairs(lp.player:WaitForChild("PlayerGui"):GetChildren()) do
-            if gui:IsA("ScreenGui") then gui:Destroy() end
-        end
-        for _, v in pairs(services.Lighting:GetChildren()) do
-            if v:IsA("Sky") or v:IsA("Atmosphere") then v:Destroy() end
-        end
         services.Lighting.Brightness = 0
         services.Lighting.GlobalShadows = false
+        services.Lighting.FogEnd = 9e9
+        for _, v in pairs(services.Lighting:GetChildren()) do
+            if v:IsA("Sky") or v:IsA("Atmosphere") or v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("SunRaysEffect") then
+                v:Destroy()
+            end
+        end
+        
         workspace.Terrain.WaterTransparency = 1
+        workspace.Terrain.WaterWaveSize = 0
+        workspace.Terrain.WaterWaveSpeed = 0
+        
         for _, obj in pairs(workspace:GetDescendants()) do
-            if obj:IsA("ParticleEmitter") or obj:IsA("PointLight") or obj:IsA("SpotLight") then
-                obj:Destroy()
-            elseif obj:IsA("BasePart") then
+            if obj:IsA("BasePart") then
                 obj.Material = Enum.Material.SmoothPlastic
                 obj.Reflectance = 0
+                obj.CastShadow = false
+            elseif obj:IsA("Decal") or obj:IsA("Texture") then
+                obj.Transparency = 1
+            elseif obj:IsA("ParticleEmitter") or obj:IsA("PointLight") or obj:IsA("SpotLight") or obj:IsA("SurfaceLight") or obj:IsA("Trail") then
+                obj:Destroy()
             end
         end
     end)
 end)
+
+tabs.other:AddSwitch("Low Power Mode (Blackscreen)", function(state)
+    local runService = game:GetService("RunService")
+    if state then
+        _G.BlackscreenActive = true
+        if not _G.BlackscreenGui then
+            local sg = Instance.new("ScreenGui", game:GetService("CoreGui"))
+            sg.IgnoreGuiInset = true
+            sg.DisplayOrder = -100 
+            
+            local frame = Instance.new("Frame", sg)
+            frame.Size = UDim2.new(1, 0, 1, 0)
+            frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            local text = Instance.new("TextLabel", frame)
+            text.Size = UDim2.new(1, 0, 1, 0)
+            text.BackgroundTransparency = 1
+            text.TextColor3 = Color3.fromRGB(138, 43, 226)
+            text.Text = "PROYECTADOS HUB | LOW POWER MODE ACTIVO"
+            text.Font = Enum.Font.GothamBold
+            text.TextSize = 24
+            _G.BlackscreenGui = sg
+        end
+        runService:Set3dRenderingEnabled(false)
+    else
+        _G.BlackscreenActive = false
+        if _G.BlackscreenGui then
+            _G.BlackscreenGui:Destroy()
+            _G.BlackscreenGui = nil
+        end
+        runService:Set3dRenderingEnabled(true)
+    end
+end):Set(false)
 
 tabs.other:AddLabel("PRIVACY")
 tabs.other:AddSwitch("Hide Name", function(state) privacyRedactor:SetNameEnabled(state) end):Set(true)
