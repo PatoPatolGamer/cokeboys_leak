@@ -1242,9 +1242,31 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                     end
 
                     if bossDead then
+                        -- Espera de 2 segundos tras acabar la vida del boss
                         task.wait(2)
-                        utils.tpE(tabs.boss.AutoChestData.TargetPos)
-                        task.wait(3)
+                        
+                        -- Teletransporte a la posición del cofre
+                        local char = lp.player.Character or lp.player.CharacterAdded:Wait()
+                        local hrp = char:WaitForChild("HumanoidRootPart")
+                        hrp.CFrame = CFrame.new(tabs.boss.AutoChestData.TargetPos)
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        
+                        -- Spameo de la tecla E durante 4 segundos con un intervalo de 0.5s por click
+                        local spamDuration = 4
+                        local spamInterval = 0.5
+                        local elapsed = 0
+                        
+                        while elapsed < spamDuration and utils.isCurrent() and tabs.boss.AutoChestData.Running do
+                            pcall(function()
+                                services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                task.wait(0.08)
+                                services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                            end)
+                            task.wait(spamInterval)
+                            elapsed = elapsed + spamInterval
+                        end
+                        
+                        task.wait(3) -- Pausa final de seguridad
                     end
                 end)
                 task.wait(0.5)
