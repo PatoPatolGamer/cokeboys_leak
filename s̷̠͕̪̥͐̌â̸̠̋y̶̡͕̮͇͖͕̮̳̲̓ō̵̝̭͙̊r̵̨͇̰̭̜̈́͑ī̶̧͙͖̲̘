@@ -191,7 +191,8 @@ local services = {
     CollectionService = game:GetService("CollectionService"),
     HttpService = game:GetService("HttpService"),
     StarterGui = game:GetService("StarterGui"),
-    MarketplaceService = game:GetService("MarketplaceService")
+    MarketplaceService = game:GetService("MarketplaceService"),
+    Stats = game:GetService("Stats")
 }
 
 local utils = {}
@@ -573,6 +574,9 @@ tabs.fullFarm.sendRate = math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.m
 tabs.fullFarm.maxBurst = 24
 tabs.fullFarm.Tokens = 0
 
+-- Opción para permitir la regulación automática
+tabs.fullFarm.UseRegulation = true 
+
 tabs.fullFarm.controlInterval = 0.5
 tabs.fullFarm.lastControlAt = tick()
 tabs.fullFarm.lastControlStrength = tabs.fullFarm.strength.Value
@@ -662,6 +666,23 @@ tabs.fullFarm.calculatePaceAndAverage = function()
 end
 
 tabs.fullFarm.updateAdaptiveRate = function()
+    -- Revisar Ping en tiempo real
+    local currentPing = 0
+    pcall(function()
+        currentPing = services.Stats.Network:ServerStatsItem("Data Ping"):GetValue()
+    end)
+
+    -- Si el ping supera los 250ms, forzamos la regulación automáticamente
+    local pingSpike = currentPing > 250 
+    local enforceRegulation = tabs.fullFarm.UseRegulation or pingSpike
+
+    if not enforceRegulation then
+        tabs.fullFarm.sendRate = tabs.fullFarm.maxSendRate
+        tabs.fullFarm.Status.Text = "Status: Forced | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
+        tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(150, 100, 255)
+        return
+    end
+
     tabs.fullFarm.controlNow = tick()
     tabs.fullFarm.controlElapsed = tabs.fullFarm.controlNow - tabs.fullFarm.lastControlAt
     if tabs.fullFarm.controlElapsed < tabs.fullFarm.controlInterval then return end
@@ -669,20 +690,26 @@ tabs.fullFarm.updateAdaptiveRate = function()
     tabs.fullFarm.serverProgress = tabs.fullFarm.strength.Value > tabs.fullFarm.lastControlStrength
         or tabs.fullFarm.durability.Value > tabs.fullFarm.lastControlDurability
 
-    if tabs.fullFarm.serverProgress then
+    if pingSpike or not tabs.fullFarm.serverProgress then
+        tabs.fullFarm.stalledIntervals = tabs.fullFarm.stalledIntervals + 1
+    else
         tabs.fullFarm.stalledIntervals = 0
         tabs.fullFarm.sendRate = math.min(tabs.fullFarm.maxSendRate, tabs.fullFarm.sendRate * 1.12)
         tabs.fullFarm.Status.Text = (tabs.fullFarm.sendRate >= tabs.fullFarm.maxSendRate and "Status: Farming | " or "Status: Preparing | ") .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
         tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
-    else
-        tabs.fullFarm.stalledIntervals = tabs.fullFarm.stalledIntervals + 1
     end
 
     if tabs.fullFarm.stalledIntervals >= 2 then
         tabs.fullFarm.sendRate = math.max(math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.maxSendRate), tabs.fullFarm.sendRate * 0.65)
         tabs.fullFarm.Tokens = 0
-        tabs.fullFarm.Status.Text = "Status: Slowing for server | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
-        tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
+        
+        if pingSpike then
+            tabs.fullFarm.Status.Text = "Status: High Ping ("..math.floor(currentPing).."ms) | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
+            tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 100, 100)
+        else
+            tabs.fullFarm.Status.Text = "Status: Slowing for server | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
+            tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
+        end
     end
 
     tabs.fullFarm.lastControlAt = tabs.fullFarm.controlNow
@@ -746,6 +773,10 @@ tabs.fullFarm:AddTextBox("Max reps/s: " .. tabs.fullFarm.maxSendRate, function(i
 end, {clear = false})
 
 tabs.fullFarm:AddLabel("Recommended Speed: 640, you can always try more.")
+
+tabs.fullFarm:AddSwitch("Auto Regulation (Safe)", function(state)
+    tabs.fullFarm.UseRegulation = state
+end):Set(true)
 
 tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep", function(state)
     recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
