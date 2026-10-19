@@ -398,7 +398,7 @@ local function createPrivacyRedactor(player, key)
 end
 
 -- ==========================================
--- INICIALIZACIÓN DE INTERFAZ
+-- INICIALIZACIÓN DE INTERFAZ Y SISTEMAS BASE
 -- ==========================================
 utils.library = loadstring(game:HttpGet("https://raw.githubusercontent.com/horarybrech/Hub/refs/heads/main/ProyectadosUiV2.luau?cache=" .. tostring(os.time()), true))()
 utils.ProyectadosHub = utils.library:AddWindow("Proyectados Hub | Muscle Legends", {
@@ -407,9 +407,19 @@ utils.ProyectadosHub = utils.library:AddWindow("Proyectados Hub | Muscle Legends
     can_resize = true,
 })
 
+-- ANTI-AFK CON NOTIFICACIÓN
 utils.connect(lp.player.Idled, function()
     services.VirtualUser:CaptureController()
     services.VirtualUser:ClickButton2(Vector2.new())
+end)
+
+pcall(function()
+    services.StarterGui:SetCore("SendNotification", {
+        Title = "Anti-AFK Activado",
+        Text = "Hecho por Horarybrech",
+        Button1 = "Gracias",
+        Duration = 5
+    })
 end)
 
 utils.connect(lp.player.CharacterAdded, function(character)
@@ -574,7 +584,6 @@ tabs.fullFarm.sendRate = math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.m
 tabs.fullFarm.maxBurst = 24
 tabs.fullFarm.Tokens = 0
 
--- Opción para permitir la regulación automática
 tabs.fullFarm.UseRegulation = true 
 
 tabs.fullFarm.controlInterval = 0.5
@@ -666,13 +675,11 @@ tabs.fullFarm.calculatePaceAndAverage = function()
 end
 
 tabs.fullFarm.updateAdaptiveRate = function()
-    -- Revisar Ping en tiempo real
     local currentPing = 0
     pcall(function()
         currentPing = services.Stats.Network:ServerStatsItem("Data Ping"):GetValue()
     end)
 
-    -- Si el ping supera los 250ms, forzamos la regulación automáticamente
     local pingSpike = currentPing > 250 
     local enforceRegulation = tabs.fullFarm.UseRegulation or pingSpike
 
@@ -1234,7 +1241,6 @@ tabs.boss.HalloweenData = {
 local halloweenBossNames = {"Frankenbrute", "Scarecrow Colossus", "Grim Reaper", "Pumpkin Titan"}
 
 tabs.boss:AddLabel("AUTO CHEST SYSTEM")
-
 tabs.boss.AutoChestData = {
     Running = false,
     TargetPos = Vector3.new(-10, 37, -1252)
@@ -1249,6 +1255,7 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                 pcall(function()
                     local bossDead = false
                     
+                    -- Verificar Boss Normal
                     for _, candidate in ipairs(services.CollectionService:GetTagged("BossEventBoss")) do
                         if candidate:IsA("Model") and candidate:IsDescendantOf(services.Workspace) then
                             local health, _, _ = tabs.boss.getBossData(candidate)
@@ -1259,6 +1266,7 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                         end
                     end
                     
+                    -- Verificar Boss de Halloween
                     if not bossDead then
                         for _, bossName in ipairs(halloweenBossNames) do
                             local candidate = services.Workspace:FindFirstChild(bossName)
@@ -1272,32 +1280,36 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                         end
                     end
 
+                    -- Sistema Optimizado de Recolección de Cofre
                     if bossDead then
-                        -- Espera de 2 segundos tras acabar la vida del boss
-                        task.wait(2)
-                        
-                        -- Teletransporte a la posición del cofre
+                        task.wait(1.5)
                         local char = lp.player.Character or lp.player.CharacterAdded:Wait()
                         local hrp = char:WaitForChild("HumanoidRootPart")
-                        hrp.CFrame = CFrame.new(tabs.boss.AutoChestData.TargetPos)
-                        hrp.AssemblyLinearVelocity = Vector3.zero
                         
-                        -- Spameo de la tecla E durante 4 segundos con un intervalo de 0.5s por click
-                        local spamDuration = 4
-                        local spamInterval = 0.5
-                        local elapsed = 0
+                        local spawnsFolder = services.Workspace:FindFirstChild("spawnsFolder")
+                        local chestRoot = spawnsFolder and spawnsFolder:FindFirstChild("Root")
+                        local chestPrompt = chestRoot and chestRoot:FindFirstChild("bossChestPrompt")
                         
-                        while elapsed < spamDuration and utils.isCurrent() and tabs.boss.AutoChestData.Running do
-                            pcall(function()
-                                services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                                task.wait(0.08)
-                                services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                            end)
-                            task.wait(spamInterval)
-                            elapsed = elapsed + spamInterval
+                        if chestRoot then
+                            hrp.CFrame = chestRoot.CFrame * CFrame.new(0, 3, 0)
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            task.wait(0.2)
+                            
+                            if chestPrompt then
+                                if fireproximityprompt then
+                                    fireproximityprompt(chestPrompt, 1)
+                                else
+                                    chestPrompt.HoldDuration = 0
+                                    chestPrompt:InputHoldBegin()
+                                    task.wait(0.1)
+                                    chestPrompt:InputHoldEnd()
+                                end
+                            end
+                        else
+                            hrp.CFrame = CFrame.new(tabs.boss.AutoChestData.TargetPos)
                         end
                         
-                        task.wait(3) -- Pausa final de seguridad
+                        task.wait(3)
                     end
                 end)
                 task.wait(0.5)
@@ -1710,6 +1722,24 @@ task.spawn(function()
         end
     end
 end)
+
+tabs.misiones:AddLabel("CRYSTALS")
+tabs.misiones:AddSwitch("Auto Open Hallowed Crystal", function(state)
+    _G.AutoAbrirCristales = state
+    if state then
+        task.spawn(function()
+            local event = services.ReplicatedStorage:FindFirstChild("rEvents") and services.ReplicatedStorage.rEvents:FindFirstChild("openCrystalRemote")
+            while _G.AutoAbrirCristales and utils.isCurrent() do
+                pcall(function()
+                    if event then
+                        event:InvokeServer("openCrystalBulk", "Hallowed Crystal", 10)
+                    end
+                end)
+                task.wait(4)
+            end
+        end)
+    end
+end):Set(false)
 
 tabs.misiones:AddLabel("FORTUNE WHEEL")
 tabs.misiones:AddSwitch("Auto Spin Wheel", function(bool)
