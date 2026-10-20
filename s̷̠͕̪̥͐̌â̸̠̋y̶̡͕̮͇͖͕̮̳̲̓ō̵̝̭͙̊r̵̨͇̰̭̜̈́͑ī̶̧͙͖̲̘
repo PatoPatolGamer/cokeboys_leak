@@ -120,30 +120,30 @@ if not verified then
     btnCorner.CornerRadius = UDim.new(0, 8)
     btnCorner.Parent = submitButton
 
-    local discordButton = Instance.new("TextButton")
-    discordButton.Size = UDim2.new(0.85, 0, 0, 42)
-    discordButton.Position = UDim2.new(0.5, 0, 0.73, 0)
-    discordButton.AnchorPoint = Vector2.new(0.5, 0)
-    discordButton.Text = "DISCORD"
-    discordButton.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-    discordButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-    discordButton.Font = Enum.Font.GothamBold
-    discordButton.TextSize = 14
-    discordButton.Parent = mainFrame
+    local getKeyButton = Instance.new("TextButton")
+    getKeyButton.Size = UDim2.new(0.85, 0, 0, 42)
+    getKeyButton.Position = UDim2.new(0.5, 0, 0.73, 0)
+    getKeyButton.AnchorPoint = Vector2.new(0.5, 0)
+    getKeyButton.Text = "OBTENER KEY"
+    getKeyButton.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
+    getKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    getKeyButton.Font = Enum.Font.GothamBold
+    getKeyButton.TextSize = 14
+    getKeyButton.Parent = mainFrame
 
-    local discordCorner = Instance.new("UICorner")
-    discordCorner.CornerRadius = UDim.new(0, 8)
-    discordCorner.Parent = discordButton
+    local getKeyCorner = Instance.new("UICorner")
+    getKeyCorner.CornerRadius = UDim.new(0, 8)
+    getKeyCorner.Parent = getKeyButton
 
-    discordButton.MouseButton1Click:Connect(function()
+    getKeyButton.MouseButton1Click:Connect(function()
         pcall(function()
             if setclipboard then
-                setclipboard("https://discord.gg/WRJ5RYpq6Z")
+                setclipboard("https://direct-link.net/10253076/Hj03OYYaxXGq")
             end
         end)
-        discordButton.Text = "Link copiado al portapapeles"
+        getKeyButton.Text = "Link copiado al portapapeles"
         task.wait(2)
-        discordButton.Text = "DISCORD"
+        getKeyButton.Text = "OBTENER KEY"
     end)
 
     submitButton.MouseButton1Click:Connect(function()
@@ -192,7 +192,10 @@ local services = {
     HttpService = game:GetService("HttpService"),
     StarterGui = game:GetService("StarterGui"),
     MarketplaceService = game:GetService("MarketplaceService"),
-    Stats = game:GetService("Stats")
+    Stats = game:GetService("Stats"),
+    GuiService = game:GetService("GuiService"),
+    LinkingService = game:GetService("LinkingService"),
+    TeleportService = game:GetService("TeleportService")
 }
 
 local utils = {}
@@ -209,8 +212,8 @@ function utils.isCurrent()
     return utils.Generation == _G.HorarybrechMainGeneration
 end
 
-function utils.connect(signal, callback, connection)
-    connection = signal:Connect(callback)
+function utils.connect(signal, callback)
+    local connection = signal:Connect(callback)
     table.insert(_G.HorarybrechMainConnections, connection)
     return connection
 end
@@ -242,6 +245,16 @@ utils.remotes = {
     MachineInteract = rEvents and rEvents:WaitForChild("machineInteractRemote"),
     GuiDamageEvent = rEvents and rEvents:FindFirstChild("guiDamageEvent")
 }
+
+local function readDataPing()
+    local success, ping = pcall(function()
+        return services.Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    end)
+    if success and type(ping) == "number" and ping == ping and ping >= 0 and ping < math.huge then
+        return ping
+    end
+    return nil
+end
 
 function utils.formatNumber(n)
     if n >= 1e18 then return string.format("%.1fqi", n / 1e18)
@@ -311,8 +324,7 @@ function formatPaceSilence(ratePerSecond)
     return formatNumberSilence(ratePerSecond) .. "/s | "
         .. formatNumberSilence(ratePerSecond * 60) .. "/min | "
         .. formatNumberSilence(ratePerSecond * 3600) .. "/h | "
-        .. formatNumberSilence(ratePerSecond * 86400) .. "/d | "
-        .. formatNumberSilence(ratePerSecond * 604800) .. "/w"
+        .. formatNumberSilence(ratePerSecond * 86400) .. "/d"
 end
 
 local function createPrivacyRedactor(player, key)
@@ -389,7 +401,7 @@ local function createPrivacyRedactor(player, key)
     end
 
     task.spawn(function()
-        while _G.HorarybrechPrivacyGenerations[key] == generation do
+        while _G.HorarybrechPrivacyGenerations[key] == generation and utils.isCurrent() do
             if redactor.NameEnabled or redactor.StatsEnabled then pcall(update) end
             task.wait(4)
         end
@@ -533,7 +545,7 @@ tabs.farming.RockFarmToggle = tabs.farming:AddSwitch("Auto Rock", function(enabl
                             end
                         end
                         local char = lp.player.Character
-                        if cachedRock and char and char:FindFirstChild("LeftHand") then
+                        if cachedRock and char and char:FindFirstChild("LeftHand") and char:FindFirstChild("RightHand") then
                             firetouchinterest(cachedRock, char.RightHand, 0)
                             firetouchinterest(cachedRock, char.RightHand, 1)
                             firetouchinterest(cachedRock, char.LeftHand, 0)
@@ -560,7 +572,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM
+-- TAB: FAST FARM (ACTUALIZADO A STRENGTH2 LOGIC)
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -569,7 +581,6 @@ tabs.fullFarm.strength = tabs.fullFarm.leaderstats:WaitForChild("Strength")
 tabs.fullFarm.durability = lp.player:WaitForChild("Durability")
 tabs.fullFarm.running = false
 tabs.fullFarm.workerActive = false
-
 tabs.fullFarm.startedAt = 0
 tabs.fullFarm.totalElapsed = 0
 tabs.fullFarm.timerStarted = false
@@ -578,33 +589,37 @@ tabs.fullFarm.gainedBaselineSet = false
 tabs.fullFarm.statSamples = {Strength = tabs.fullFarm.strength.Value, Durability = tabs.fullFarm.durability.Value}
 tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
 
-tabs.fullFarm.initialSendRate = 200
-tabs.fullFarm.maxSendRate = 640
-tabs.fullFarm.sendRate = math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.maxSendRate)
+-- PARÁMETROS ADAPTATIVOS DE PING AVANZADO
+tabs.fullFarm.initialSendRate = 300
+tabs.fullFarm.maxSendRate = 480
+tabs.fullFarm.sendRate = tabs.fullFarm.initialSendRate
 tabs.fullFarm.maxBurst = 24
 tabs.fullFarm.Tokens = 0
-
-tabs.fullFarm.UseRegulation = true 
-
-tabs.fullFarm.controlInterval = 0.5
-tabs.fullFarm.lastControlAt = tick()
-tabs.fullFarm.lastControlStrength = tabs.fullFarm.strength.Value
-tabs.fullFarm.lastControlDurability = tabs.fullFarm.durability.Value
-tabs.fullFarm.stalledIntervals = 0
-
-tabs.fullFarm.calculationInterval = 10
-tabs.fullFarm.lastCalculationAt = tick()
-tabs.fullFarm.lastCalculatedStrength = tabs.fullFarm.strength.Value
-tabs.fullFarm.lastCalculatedDurability = tabs.fullFarm.durability.Value
+tabs.fullFarm.pingLimit = 350
+tabs.fullFarm.resumePing = 300
+tabs.fullFarm.recoverySeconds = 2
+tabs.fullFarm.rampInterval = 2
+tabs.fullFarm.rampStep = 25
+tabs.fullFarm.minAdaptiveRate = 450
+tabs.fullFarm.fineRampStep = 2
+tabs.fullFarm.backoffStep = 4
+tabs.fullFarm.learnedLimit = false
+tabs.fullFarm.lastPingSampleAt = os.clock()
+tabs.fullFarm.lastPingSample = nil
+tabs.fullFarm.lastPingRise = 0
+tabs.fullFarm.stableInterval = 60
+tabs.fullFarm.stableStep = 2
+tabs.fullFarm.stableSince = os.clock()
+tabs.fullFarm.pingPaused = false
+tabs.fullFarm.lastRampAt = os.clock()
+tabs.fullFarm.LastAt = os.clock()
 
 tabs.fullFarm.Status = tabs.fullFarm:AddLabel("Status: Inactive")
 tabs.fullFarm.Runtime = tabs.fullFarm:AddLabel("Runtime: 0d 0h 0m 0s")
 tabs.fullFarm.StrengthStats = tabs.fullFarm:AddLabel("Strength: " .. formatCurrentStat(tabs.fullFarm.strength.Value) .. " | Gained: 0")
 tabs.fullFarm.DurabilityStats = tabs.fullFarm:AddLabel("Durability: " .. formatCurrentStat(tabs.fullFarm.durability.Value) .. " | Gained: 0")
-tabs.fullFarm.StrengthPace = tabs.fullFarm:AddLabel("Str Pace: --/s | --/min | --/h | --/d | --/w")
-tabs.fullFarm.DurabilityPace = tabs.fullFarm:AddLabel("Dura Pace: --/s | --/min | --/h | --/d | --/w")
-tabs.fullFarm.StrengthAverage = tabs.fullFarm:AddLabel("Str Ø: --/s | --/min | --/h | --/d | --/w")
-tabs.fullFarm.DurabilityAverage = tabs.fullFarm:AddLabel("Dura Ø: --/s | --/min | --/h | --/d | --/w")
+tabs.fullFarm.StrengthAverage = tabs.fullFarm:AddLabel("Str Ø: --/s | --/min | --/h | --/d")
+tabs.fullFarm.DurabilityAverage = tabs.fullFarm:AddLabel("Dura Ø: --/s | --/min | --/h | --/d")
 tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 
 local function getElapsed(tab)
@@ -653,99 +668,112 @@ tabs.fullFarm.updateStats = function()
         .. " | Gained: " .. (tabs.fullFarm.running and not tabs.fullFarm.timerStarted and "Preparing" or formatNumberSilence(tabs.fullFarm.statGains.Durability))
 end
 
-tabs.fullFarm.calculatePaceAndAverage = function()
+tabs.fullFarm.updateAverage = function()
     local elapsed = getElapsed(tabs.fullFarm)
-    if elapsed > 0 then
-        tabs.fullFarm.StrengthAverage.Text = "Str Ø: " .. formatPaceSilence(tabs.fullFarm.statGains.Strength / elapsed)
-        tabs.fullFarm.DurabilityAverage.Text = "Dura Ø: " .. formatPaceSilence(tabs.fullFarm.statGains.Durability / elapsed)
-    end
+    if elapsed <= 0 then return end
+    tabs.fullFarm.StrengthAverage.Text = "Str Ø: " .. formatPaceSilence(tabs.fullFarm.statGains.Strength / elapsed)
+    tabs.fullFarm.DurabilityAverage.Text = "Dura Ø: " .. formatPaceSilence(tabs.fullFarm.statGains.Durability / elapsed)
+end
 
-    if tick() - tabs.fullFarm.lastCalculationAt >= tabs.fullFarm.calculationInterval and tabs.fullFarm.timerStarted then
-        local calcElapsed = tick() - tabs.fullFarm.lastCalculationAt
-        local strDelta = tabs.fullFarm.strength.Value - tabs.fullFarm.lastCalculatedStrength
-        local duraDelta = tabs.fullFarm.durability.Value - tabs.fullFarm.lastCalculatedDurability
-        
-        if strDelta > 0 then tabs.fullFarm.StrengthPace.Text = "Str Pace: " .. formatPaceSilence(strDelta / calcElapsed) end
-        if duraDelta > 0 then tabs.fullFarm.DurabilityPace.Text = "Dura Pace: " .. formatPaceSilence(duraDelta / calcElapsed) end
-        
-        tabs.fullFarm.lastCalculationAt = tick()
-        tabs.fullFarm.lastCalculatedStrength = tabs.fullFarm.strength.Value
-        tabs.fullFarm.lastCalculatedDurability = tabs.fullFarm.durability.Value
+tabs.fullFarm.startMeasurement = function()
+    if not tabs.fullFarm.running or tabs.fullFarm.timerStarted then return end
+    tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
+    tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
+    setTimerRunning(tabs.fullFarm, true)
+    tabs.fullFarm.nextAverageElapsed = getElapsed(tabs.fullFarm) + 10
+    tabs.fullFarm.updateStats()
+end
+
+tabs.fullFarm.updateStatus = function(ping)
+    local tab = tabs.fullFarm
+    local pingText = ping and string.format(" | Ping: %.1f ms", ping) or " | Ping: unavailable"
+    if not tab.running then
+        tab.Status.Text = (tab.gainedBaselineSet and "Status: Paused" or "Status: Inactive") .. pingText
+        tab.Status.TextColor3 = tab.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
+    elseif tab.pingPaused or not ping or ping > tab.pingLimit then
+        tab.Status.Text = "Status: Waiting | " .. formatNumberSilence(tab.sendRate) .. " reps/s" .. pingText
+        tab.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
+    else
+        tab.Status.Text = "Status: Farming | " .. formatNumberSilence(tab.sendRate) .. " reps/s" .. pingText
+        tab.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
     end
 end
 
 tabs.fullFarm.updateAdaptiveRate = function()
-    local currentPing = 0
-    pcall(function()
-        currentPing = services.Stats.Network:ServerStatsItem("Data Ping"):GetValue()
-    end)
-
-    local pingSpike = currentPing > 250 
-    local enforceRegulation = tabs.fullFarm.UseRegulation or pingSpike
-
-    if not enforceRegulation then
-        tabs.fullFarm.sendRate = tabs.fullFarm.maxSendRate
-        tabs.fullFarm.Status.Text = "Status: Forced | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
-        tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(150, 100, 255)
-        return
+    local tab = tabs.fullFarm
+    local now = os.clock()
+    local ping = readDataPing()
+    tab.sendRate = math.min(tab.sendRate, tab.maxSendRate)
+    
+    if ping and now - tab.lastPingSampleAt >= 1 then
+        tab.lastPingRise = tab.lastPingSample and ping - tab.lastPingSample or 0
+        tab.lastPingSample = ping
+        tab.lastPingSampleAt = now
     end
-
-    tabs.fullFarm.controlNow = tick()
-    tabs.fullFarm.controlElapsed = tabs.fullFarm.controlNow - tabs.fullFarm.lastControlAt
-    if tabs.fullFarm.controlElapsed < tabs.fullFarm.controlInterval then return end
-
-    tabs.fullFarm.serverProgress = tabs.fullFarm.strength.Value > tabs.fullFarm.lastControlStrength
-        or tabs.fullFarm.durability.Value > tabs.fullFarm.lastControlDurability
-
-    if pingSpike or not tabs.fullFarm.serverProgress then
-        tabs.fullFarm.stalledIntervals = tabs.fullFarm.stalledIntervals + 1
-    else
-        tabs.fullFarm.stalledIntervals = 0
-        tabs.fullFarm.sendRate = math.min(tabs.fullFarm.maxSendRate, tabs.fullFarm.sendRate * 1.12)
-        tabs.fullFarm.Status.Text = (tabs.fullFarm.sendRate >= tabs.fullFarm.maxSendRate and "Status: Farming | " or "Status: Preparing | ") .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
-        tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
-    end
-
-    if tabs.fullFarm.stalledIntervals >= 2 then
-        tabs.fullFarm.sendRate = math.max(math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.maxSendRate), tabs.fullFarm.sendRate * 0.65)
-        tabs.fullFarm.Tokens = 0
-        
-        if pingSpike then
-            tabs.fullFarm.Status.Text = "Status: High Ping ("..math.floor(currentPing).."ms) | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
-            tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 100, 100)
-        else
-            tabs.fullFarm.Status.Text = "Status: Slowing for server | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
-            tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
+    
+    if not ping or ping > tab.pingLimit then
+        if not tab.pingPaused then
+            tab.sendRate = math.max(math.min(tab.minAdaptiveRate, tab.sendRate), tab.sendRate - tab.backoffStep)
+            tab.learnedLimit = true
         end
+        tab.pingPaused = true
+        tab.stableSince = now
+        tab.recoveryStartedAt = nil
+    elseif tab.pingPaused then
+        if ping < tab.resumePing then
+            tab.recoveryStartedAt = tab.recoveryStartedAt or now
+            if now - tab.recoveryStartedAt >= tab.recoverySeconds then
+                tab.pingPaused = false
+                tab.recoveryStartedAt = nil
+                tab.lastRampAt = now
+                tab.stableSince = now
+                tab.lastPingSample = ping
+                tab.lastPingRise = 0
+            end
+        else
+            tab.recoveryStartedAt = nil
+        end
+    elseif now - tab.lastRampAt >= tab.rampInterval then
+        local pressure = ping >= tab.resumePing or (ping >= 150 and tab.lastPingRise >= 20)
+        if pressure then
+            tab.sendRate = math.max(math.min(tab.minAdaptiveRate, tab.sendRate), tab.sendRate - tab.fineRampStep)
+            tab.learnedLimit = true
+            tab.stableSince = now
+        elseif tab.sendRate < tab.minAdaptiveRate then
+            tab.sendRate = math.min(tab.minAdaptiveRate, tab.sendRate + tab.rampStep)
+            tab.stableSince = now
+        elseif not tab.learnedLimit then
+            tab.sendRate = math.min(tab.maxSendRate, tab.sendRate + tab.fineRampStep)
+            tab.stableSince = now
+        elseif now - tab.stableSince >= tab.stableInterval then
+            tab.sendRate = math.min(tab.maxSendRate, tab.sendRate + tab.stableStep)
+            tab.stableSince = now
+        end
+        tab.lastRampAt = now
     end
 
-    tabs.fullFarm.lastControlAt = tabs.fullFarm.controlNow
-    tabs.fullFarm.lastControlStrength = tabs.fullFarm.strength.Value
-    tabs.fullFarm.lastControlDurability = tabs.fullFarm.durability.Value
-end
-
-tabs.fullFarm.startMeasurement = function()
-    if not tabs.fullFarm.running or tabs.fullFarm.timerStarted or tabs.fullFarm.sendRate < tabs.fullFarm.maxSendRate then return end
-    tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
-    tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
-    setTimerRunning(tabs.fullFarm, true)
-    tabs.fullFarm.nextAverageElapsed = getElapsed(tabs.fullFarm) + 5
-    tabs.fullFarm.lastCalculationAt = tick()
-    tabs.fullFarm.lastCalculatedStrength = tabs.fullFarm.strength.Value
-    tabs.fullFarm.lastCalculatedDurability = tabs.fullFarm.durability.Value
-    tabs.fullFarm.updateStats()
+    if tab.pingPaused then
+        tab.Tokens = 0
+        tab.LastAt = now
+    end
+    tab.updateStatus(ping)
 end
 
 tabs.fullFarm.workerLoop = function()
     tabs.fullFarm.LastAt = os.clock()
-    local function isRunning() return tabs.fullFarm.running end
-    while tabs.fullFarm.running do
+    local function isRunning() return tabs.fullFarm.running and not tabs.fullFarm.pingPaused and utils.isCurrent() end
+    while tabs.fullFarm.running and utils.isCurrent() do
         tabs.fullFarm.updateAdaptiveRate()
         tabs.fullFarm.startMeasurement()
-        sendTrainingReps(tabs.fullFarm, tabs.fullFarm.sendRate, tabs.fullFarm.maxBurst, isRunning)
+        if not tabs.fullFarm.pingPaused then
+            sendTrainingReps(tabs.fullFarm, tabs.fullFarm.sendRate, tabs.fullFarm.maxBurst, isRunning)
+        end
         services.RunService.Heartbeat:Wait()
     end
     tabs.fullFarm.workerActive = false
+    if tabs.fullFarm.running and utils.isCurrent() then
+        tabs.fullFarm.startWorker()
+    end
 end
 
 tabs.fullFarm.startWorker = function()
@@ -765,7 +793,7 @@ utils.connect(tabs.fullFarm.durability:GetPropertyChangedSignal("Value"), functi
 end)
 
 tabs.fullFarm:AddLabel("FARM CONTROLS")
-tabs.fullFarm:AddTextBox("Max reps/s: " .. tabs.fullFarm.maxSendRate, function(inputText)
+tabs.fullFarm:AddTextBox("Max reps/s (Def: 480): ", function(inputText)
     local value = tonumber(inputText)
     if not value or value == math.huge or value == -math.huge then return end
     value = math.max(1, value)
@@ -779,13 +807,9 @@ tabs.fullFarm:AddTextBox("Max reps/s: " .. tabs.fullFarm.maxSendRate, function(i
     tabs.fullFarm.sendRate = math.min(tabs.fullFarm.sendRate, tabs.fullFarm.maxSendRate)
 end, {clear = false})
 
-tabs.fullFarm:AddLabel("Recommended Speed: 640, you can always try more.")
+tabs.fullFarm:AddLabel("Auto Adaptive Ping Speed System is Active.")
 
-tabs.fullFarm:AddSwitch("Auto Regulation (Safe)", function(state)
-    tabs.fullFarm.UseRegulation = state
-end):Set(true)
-
-tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep", function(state)
+tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", function(state)
     recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
     recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
     setTimerRunning(tabs.fullFarm, false)
@@ -793,14 +817,22 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep", function(state
     tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
     tabs.fullFarm.running = state
     tabs.fullFarm.Tokens = 0
+    
     if state then
+        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then tabs.fullRebirth.FastRebirthV2Toggle:Set(false) end
         tabs.fullFarm.gainedBaselineSet = true
-        tabs.fullFarm.sendRate = math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.maxSendRate)
+        tabs.fullFarm.maxSendRate = tabs.fullFarm.maxSendRate or 480
+        tabs.fullFarm.learnedLimit = false
+        tabs.fullFarm.lastPingSampleAt = os.clock()
+        tabs.fullFarm.lastPingSample = nil
+        tabs.fullFarm.lastPingRise = 0
+        tabs.fullFarm.sendRate = tabs.fullFarm.initialSendRate
+        tabs.fullFarm.pingPaused = false
+        tabs.fullFarm.recoveryStartedAt = nil
         tabs.fullFarm.LastAt = os.clock()
-        tabs.fullFarm.lastControlAt = tick()
-        tabs.fullFarm.lastControlStrength = tabs.fullFarm.strength.Value
-        tabs.fullFarm.lastControlDurability = tabs.fullFarm.durability.Value
-        tabs.fullFarm.stalledIntervals = 0
+        tabs.fullFarm.lastRampAt = os.clock()
+        tabs.fullFarm.stableSince = os.clock()
+        
         tabs.fullFarm.Status.Text = "Status: Preparing | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
         tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         tabs.fullFarm.startWorker()
@@ -810,17 +842,28 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep", function(state
         tabs.fullFarm.updateRuntime()
     end
     tabs.fullFarm.updateStats()
+    tabs.fullFarm.updateStatus(readDataPing())
 end)
-
 tabs.fullFarm.FastRepToggle:Set(false)
 
 task.spawn(function()
-    while true do
-        tabs.fullFarm.updateRuntime()
-        if tabs.fullFarm.timerStarted then
-            tabs.fullFarm.calculatePaceAndAverage()
+    while utils.isCurrent() do
+        local ping = readDataPing()
+        if not tabs.fullFarm.running then
+            tabs.fullFarm.updateStatus(ping)
         end
-        task.wait(1)
+        task.wait(0.5)
+    end
+end)
+
+task.spawn(function()
+    while utils.isCurrent() do
+        tabs.fullFarm.updateRuntime()
+        if tabs.fullFarm.timerStarted and getElapsed(tabs.fullFarm) >= (tabs.fullFarm.nextAverageElapsed or 10) then
+            tabs.fullFarm.updateAverage()
+            tabs.fullFarm.nextAverageElapsed = getElapsed(tabs.fullFarm) + 10
+        end
+        task.wait(0.1)
     end
 end)
 
@@ -873,7 +916,7 @@ tabs.fullRebirth.updateRebirthStats = function()
     tabs.fullRebirth.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(currentCount) .. " | Gained: " .. utils.formatWithCommas(gained)
 end
 
-tabs.fullRebirth.FastRebirthV2Data.Rebirths:GetPropertyChangedSignal("Value"):Connect(function()
+utils.connect(tabs.fullRebirth.FastRebirthV2Data.Rebirths:GetPropertyChangedSignal("Value"), function()
     tabs.fullRebirth.updateRebirthStats()
 end)
 tabs.fullRebirth.updateRebirthStats()
@@ -891,7 +934,10 @@ tabs.fullRebirth.PetDatabase = {
     ["Legendary Boss Pet"] = { speed = 10, str = 10, reb = 0 },
     ["Rainbow Boss Pet"] = { speed = 10, str = 7, reb = 0 },
     ["Epic Boss Pet"] = { speed = 10, str = 0, reb = 0 },
-    ["Common Boss Pet"] = { speed = 5, str = 0, reb = 0 }
+    ["Rare Boss Pet"] = { speed = 7, str = 0, reb = 0 },
+    ["Common Boss Pet"] = { speed = 5, str = 0, reb = 0 },
+    ["Inferno Unicorn"] = { speed = 0, str = 25, reb = 0 },
+    ["Inferno Drake"] = { speed = 40, str = 0, reb = 0 }
 }
 
 tabs.fullRebirth.equipDynamicPets = function(mode, maxPets)
@@ -1038,6 +1084,7 @@ tabs.fullRebirth:AddLabel("CONTROL")
 tabs.fullRebirth.FastRebirthV2Toggle = tabs.fullRebirth:AddSwitch("Auto Rebirth", function(state)
     tabs.fullRebirth.FastRebirthV2Data.Running = state
     if state then
+        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then tabs.fullFarm.FastRepToggle:Set(false) end
         tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Starting..."
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         if not tabs.fullRebirth.FastRebirthV2Data.WorkerActive then
@@ -1255,7 +1302,6 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                 pcall(function()
                     local bossDead = false
                     
-                    -- Verificar Boss Normal
                     for _, candidate in ipairs(services.CollectionService:GetTagged("BossEventBoss")) do
                         if candidate:IsA("Model") and candidate:IsDescendantOf(services.Workspace) then
                             local health, _, _ = tabs.boss.getBossData(candidate)
@@ -1266,7 +1312,6 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                         end
                     end
                     
-                    -- Verificar Boss de Halloween
                     if not bossDead then
                         for _, bossName in ipairs(halloweenBossNames) do
                             local candidate = services.Workspace:FindFirstChild(bossName)
@@ -1280,7 +1325,6 @@ tabs.boss:AddSwitch("Auto Chest", function(state)
                         end
                     end
 
-                    -- Sistema Optimizado de Recolección de Cofre
                     if bossDead then
                         task.wait(1.5)
                         local char = lp.player.Character or lp.player.CharacterAdded:Wait()
@@ -1636,7 +1680,7 @@ AuraConfig.Toggle = tabs.clips:AddSwitch("Toggle Kill Aura", function(state)
                             
                             if dist <= AuraConfig.Range and player.Character:FindFirstChild("Humanoid").Health > 0 then
                                 pcall(function()
-                                    if char:FindFirstChild("LeftHand") then
+                                    if char:FindFirstChild("LeftHand") and char:FindFirstChild("RightHand") then
                                         firetouchinterest(targetHrp, char.LeftHand, 0)
                                         firetouchinterest(targetHrp, char.LeftHand, 1)
                                     end
@@ -1688,21 +1732,49 @@ tabs.misiones:AddSwitch("Auto Collect Quests", function(state)
     end
 end):Set(false)
 
-tabs.misiones:AddLabel("PROTEIN EGGS")
+tabs.misiones:AddLabel("BOOSTS & CONSUMABLES")
 tabs.misiones.eggsowned = tabs.misiones:AddLabel("Protein Eggs: 0")
+tabs.misiones.shakesowned = tabs.misiones:AddLabel("Tropical Shakes: 0")
 tabs.misiones.autoEgg = false
+tabs.misiones.autoShake = false
+tabs.misiones.eatAllBoostsRunning = false
 
 task.spawn(function()
-    while true do
-        local count = 0
+    while utils.isCurrent() do
+        local eggCount = 0
+        local shakeCount = 0
         local bp = lp.player:FindFirstChild("Backpack")
         if bp then
             for _, item in ipairs(bp:GetChildren()) do
-                if item.Name == "Protein Egg" then count = count + 1 end
+                if item.Name == "Protein Egg" then eggCount = eggCount + 1
+                elseif item.Name == "Tropical Shake" then shakeCount = shakeCount + 1 end
             end
         end
-        tabs.misiones.eggsowned.Text = "Protein Eggs: " .. count
-        task.wait(2)
+        tabs.misiones.eggsowned.Text = "Protein Eggs: " .. eggCount
+        tabs.misiones.shakesowned.Text = "Tropical Shakes: " .. shakeCount
+        task.wait(1)
+    end
+end)
+
+tabs.misiones.x2str = tabs.misiones:AddLabel("x2 Strength: 0d 0h 0m 0s")
+tabs.misiones.x125dur = tabs.misiones:AddLabel("x1.25 Durability: 0d 0h 0m 0s")
+
+local function formatBoostTime(seconds)
+    return string.format("%dd %dh %dm %ds", math.floor(seconds / 86400), math.floor((seconds % 86400) / 3600), math.floor((seconds % 3600) / 60), seconds % 60)
+end
+
+task.spawn(function()
+    while utils.isCurrent() do
+        local boostFolder = lp.player:FindFirstChild("boostTimersFolder")
+        local eggBoost = boostFolder and boostFolder:FindFirstChild("Protein Egg")
+        local shakeBoost = boostFolder and boostFolder:FindFirstChild("Tropical Shake")
+        
+        local eggSec = (eggBoost and eggBoost:IsA("IntValue")) and eggBoost.Value or 0
+        local shakeSec = (shakeBoost and shakeBoost:IsA("IntValue")) and shakeBoost.Value or 0
+        
+        tabs.misiones.x2str.Text = "x2 Strength: " .. formatBoostTime(eggSec)
+        tabs.misiones.x125dur.Text = "x1.25 Durability: " .. formatBoostTime(shakeSec)
+        task.wait(0.5)
     end
 end)
 
@@ -1714,9 +1786,63 @@ task.spawn(function()
                 local char = lp.player.Character
                 local bp = lp.player:FindFirstChild("Backpack")
                 local tool = (char and char:FindFirstChild("Protein Egg")) or (bp and bp:FindFirstChild("Protein Egg"))
-                if tool then for _ = 1, 5 do utils.remotes.MuscleEvent:FireServer("proteinEgg", tool) end end
+                if tool then for _ = 1, 10 do utils.remotes.MuscleEvent:FireServer("proteinEgg", tool) end end
             end)
+            task.wait(0.5)
+        else
             task.wait(1)
+        end
+    end
+end)
+
+tabs.misiones:AddSwitch("Auto Eat Shakes", function(state) tabs.misiones.autoShake = state end)
+task.spawn(function()
+    while utils.isCurrent() do
+        if tabs.misiones.autoShake then
+            pcall(function()
+                local char = lp.player.Character
+                local bp = lp.player:FindFirstChild("Backpack")
+                local tool = (char and char:FindFirstChild("Tropical Shake")) or (bp and bp:FindFirstChild("Tropical Shake"))
+                if tool then for _ = 1, 10 do utils.remotes.MuscleEvent:FireServer("tropicalShake", tool) end end
+            end)
+            task.wait(0.5)
+        else
+            task.wait(1)
+        end
+    end
+end)
+
+local boostItemList = {
+    {"Tropical Shake", "tropicalShake"},
+    {"Energy Shake", "energyShake"},
+    {"Protein Bar", "proteinBar"},
+    {"TOUGH Bar", "toughBar"},
+    {"Protein Shake", "proteinShake"},
+    {"ULTRA Shake", "ultraShake"},
+    {"Energy Bar", "energyBar"},
+}
+
+tabs.misiones:AddSwitch("Eat All Boosts (Expect Lag)", function(state)
+    tabs.misiones.eatAllBoostsRunning = state
+end):Set(false)
+
+task.spawn(function()
+    while utils.isCurrent() do
+        if tabs.misiones.eatAllBoostsRunning then
+            pcall(function()
+                local char = lp.player.Character
+                local bp = lp.player:FindFirstChild("Backpack")
+                for _, bInfo in ipairs(boostItemList) do
+                    local bName, bAction = bInfo[1], bInfo[2]
+                    local bTool = (char and char:FindFirstChild(bName)) or (bp and bp:FindFirstChild(bName))
+                    if bTool then
+                        for _ = 1, 10 do
+                            utils.remotes.MuscleEvent:FireServer(bAction, bTool)
+                        end
+                    end
+                end
+            end)
+            task.wait(0.1)
         else
             task.wait(1)
         end
@@ -1817,6 +1943,92 @@ utils.connect(lp.player.CharacterAdded, function(newChar)
         bp.Position = protection.LockedPos
         bp.P = 100000
         bp.Parent = newChar:WaitForChild("HumanoidRootPart")
+    end
+end)
+
+tabs.other:AddLabel("RECONNECT SYSTEM")
+tabs.other.Reconnect = {Enabled = false, Disconnected = false, NextAttemptAt = 0, Attempting = false, LinkText = ""}
+
+tabs.other:AddTextBox("Private Server Link (optional)", function(text)
+    tabs.other.Reconnect.LinkText = text
+end, {clear = false})
+
+local function getReconnectUrl(text)
+    text = tostring(text or ""):match("^%s*(.-)%s*$")
+    if text == "" then return nil end
+    local host, path = text:match("^https?://([^/]+)(/.*)$")
+    if host ~= "roblox.com" and host ~= "www.roblox.com" then return nil, "Enter a Roblox private server link" end
+    local code = path:match("[?&]privateServerLinkCode=([%w_-]+)")
+    if code then
+        local placeId = tonumber(path:match("^/games/(%d+)"))
+        if placeId ~= game.PlaceId then return nil, "Link must be for this game" end
+        return "roblox://placeId=" .. tostring(placeId) .. "&linkCode=" .. code
+    end
+    code = path:match("[?&]code=([%w_-]+)")
+    local linkType = path:match("[?&]type=([^&#]+)")
+    if path:match("^/share%?") and code and linkType == "Server" then
+        return "roblox://navigation/share_links?code=" .. code .. "&type=Server"
+    end
+    return nil, "Invalid private server link"
+end
+
+tabs.other.checkDisconnect = function()
+    if not tabs.other.Reconnect.Enabled or tabs.other.Reconnect.Disconnected then return end
+    local success, disconnected = pcall(function()
+        local code = services.GuiService:GetErrorCode()
+        return services.GuiService:GetErrorMessage() ~= "" and (
+            services.GuiService:GetErrorType() == Enum.ConnectionError.DisconnectErrors
+            or (code >= 256 and code < 512)
+            or code >= 1024
+        )
+    end)
+    if not success then
+        local readable, visible = pcall(function()
+            local promptGui = services.CoreGui:FindFirstChild("RobloxPromptGui")
+            local overlay = promptGui and promptGui:FindFirstChild("promptOverlay")
+            local prompt = overlay and overlay:FindFirstChild("ErrorPrompt")
+            return prompt and prompt.Visible and prompt:FindFirstChild("ErrorFrame", true) ~= nil
+        end)
+        success, disconnected = readable, visible
+    end
+    if success and disconnected then
+        tabs.other.Reconnect.Disconnected = true
+        tabs.other.Reconnect.NextAttemptAt = os.clock() + 5
+    end
+end
+
+tabs.other:AddSwitch("Auto Reconnect", function(state)
+    tabs.other.Reconnect.Enabled = state
+    tabs.other.Reconnect.Disconnected = false
+    tabs.other.Reconnect.NextAttemptAt = 0
+    if state then tabs.other.checkDisconnect() end
+end):Set(false)
+
+pcall(function()
+    utils.connect(services.GuiService.ErrorMessageChanged, tabs.other.checkDisconnect)
+end)
+
+task.spawn(function()
+    while utils.isCurrent() do
+        tabs.other.checkDisconnect()
+        local rec = tabs.other.Reconnect
+        local now = os.clock()
+        if rec.Enabled and rec.Disconnected and not rec.Attempting and now >= rec.NextAttemptAt then
+            rec.Attempting = true
+            rec.NextAttemptAt = now + 30
+            pcall(function()
+                local url = getReconnectUrl(rec.LinkText)
+                if url then
+                    services.LinkingService:OpenUrl(url)
+                else
+                    if not pcall(function() services.TeleportService:TeleportReconnect() end) then
+                        services.TeleportService:Teleport(game.PlaceId, lp.player)
+                    end
+                end
+            end)
+            rec.Attempting = false
+        end
+        task.wait(1)
     end
 end)
 
