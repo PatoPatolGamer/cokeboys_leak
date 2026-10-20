@@ -2,7 +2,7 @@ local coreGui = game:GetService("CoreGui")
 local players = game:GetService("Players")
 local localPlayer = players.LocalPlayer
 
-local correctKey = "california"
+local correctKey = "Vaguens"
 local verified = false
 local keyFileName = "ProyectadosHub_Key.txt"
 
