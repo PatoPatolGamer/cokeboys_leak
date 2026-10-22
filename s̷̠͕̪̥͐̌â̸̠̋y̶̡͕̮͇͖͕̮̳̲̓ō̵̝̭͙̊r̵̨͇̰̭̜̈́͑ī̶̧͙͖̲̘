@@ -573,7 +573,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (ACTUALIZADO A STRENGTH2 LOGIC + SEMANAL)
+-- TAB: FAST FARM (ADAPTATIVE + SEMANAL)
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -820,7 +820,6 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", fun
     tabs.fullFarm.Tokens = 0
     
     if state then
-        if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then tabs.fullRebirth.FastRebirthV2Toggle:Set(false) end
         tabs.fullFarm.gainedBaselineSet = true
         tabs.fullFarm.maxSendRate = tabs.fullFarm.maxSendRate or 480
         tabs.fullFarm.learnedLimit = false
@@ -1018,8 +1017,11 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         
         while utils.isCurrent() and data.Running and data.Strength.Value < targetStrength do
-            for i = 1, repsPerBurst do
-                pcall(function() utils.remotes.MuscleEvent:FireServer("rep") end)
+            -- Si el Fast Farm está activo, dejamos que él mande las reps. Si no, las manda Auto Rebirth.
+            if not (tabs.fullFarm and tabs.fullFarm.running) then
+                for i = 1, repsPerBurst do
+                    pcall(function() utils.remotes.MuscleEvent:FireServer("rep") end)
+                end
             end
             services.RunService.Heartbeat:Wait()
         end
@@ -1085,7 +1087,6 @@ tabs.fullRebirth:AddLabel("CONTROL")
 tabs.fullRebirth.FastRebirthV2Toggle = tabs.fullRebirth:AddSwitch("Auto Rebirth", function(state)
     tabs.fullRebirth.FastRebirthV2Data.Running = state
     if state then
-        if tabs.fullFarm and tabs.fullFarm.FastRepToggle then tabs.fullFarm.FastRepToggle:Set(false) end
         tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Starting..."
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         if not tabs.fullRebirth.FastRebirthV2Data.WorkerActive then
