@@ -811,15 +811,18 @@ end, {clear = false})
 tabs.fullFarm:AddLabel("Auto Adaptive Ping Speed System is Active.")
 
 tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", function(state)
-    recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
-    recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
-    setTimerRunning(tabs.fullFarm, false)
-    tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
-    tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
-    tabs.fullFarm.running = state
-    tabs.fullFarm.Tokens = 0
-    
     if state then
+        -- FIX 1: Limpiar la calculadora y reiniciar tiempos al activar
+        tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
+        tabs.fullFarm.totalElapsed = 0
+        tabs.fullFarm.timerStarted = false
+        
+        tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
+        tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
+        
+        tabs.fullFarm.running = true
+        tabs.fullFarm.Tokens = 0
+        
         tabs.fullFarm.gainedBaselineSet = true
         tabs.fullFarm.maxSendRate = tabs.fullFarm.maxSendRate or 480
         tabs.fullFarm.learnedLimit = false
@@ -837,6 +840,11 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", fun
         tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         tabs.fullFarm.startWorker()
     else
+        recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
+        recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
+        setTimerRunning(tabs.fullFarm, false)
+        tabs.fullFarm.running = false
+        
         tabs.fullFarm.Status.Text = tabs.fullFarm.gainedBaselineSet and "Status: Paused" or "Status: Inactive"
         tabs.fullFarm.Status.TextColor3 = tabs.fullFarm.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
         tabs.fullFarm.updateRuntime()
@@ -1017,7 +1025,6 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         
         while utils.isCurrent() and data.Running and data.Strength.Value < targetStrength do
-            -- Si el Fast Farm está activo, dejamos que él mande las reps. Si no, las manda Auto Rebirth.
             if not (tabs.fullFarm and tabs.fullFarm.running) then
                 for i = 1, repsPerBurst do
                     pcall(function() utils.remotes.MuscleEvent:FireServer("rep") end)
@@ -1290,72 +1297,100 @@ tabs.boss.HalloweenData = {
 local halloweenBossNames = {"Frankenbrute", "Scarecrow Colossus", "Grim Reaper", "Pumpkin Titan"}
 
 tabs.boss:AddLabel("AUTO CHEST SYSTEM")
-tabs.boss.AutoChestData = {
-    Running = false,
-    TargetPos = Vector3.new(-10, 37, -1252)
-}
+tabs.boss.AutoChestData = { Running = false }
 
+-- FIX 2: Rastreador Avanzado de Posición de Jefes para el Auto Chest
 tabs.boss:AddSwitch("Auto Chest", function(state)
     tabs.boss.AutoChestData.Running = state
     
     if state then
         task.spawn(function()
+            local lastBosses = {}
+            
             while utils.isCurrent() and tabs.boss.AutoChestData.Running do
                 pcall(function()
-                    local bossDead = false
-                    
+                    local char = lp.player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if not hrp then return end
+
+                    local currentBosses = {}
+                    local deathPos = nil
+
+                    -- Jefes Normales
                     for _, candidate in ipairs(services.CollectionService:GetTagged("BossEventBoss")) do
                         if candidate:IsA("Model") and candidate:IsDescendantOf(services.Workspace) then
-                            local health, _, _ = tabs.boss.getBossData(candidate)
-                            if health and health <= 0 then
-                                bossDead = true
-                                break
+                            local health, _, hitbox = tabs.boss.getBossData(candidate)
+                            if hitbox and health and health > 0 then
+                                currentBosses[candidate] = hitbox.Position
                             end
                         end
                     end
                     
-                    if not bossDead then
-                        for _, bossName in ipairs(halloweenBossNames) do
-                            local candidate = services.Workspace:FindFirstChild(bossName)
-                            if candidate and candidate:IsA("Model") then
-                                local health, _, _ = tabs.boss.getBossData(candidate)
-                                if health and health <= 0 then
-                                    bossDead = true
-                                    break
-                                end
+                    -- Jefes de Halloween
+                    for _, bossName in ipairs(halloweenBossNames) do
+                        local candidate = services.Workspace:FindFirstChild(bossName)
+                        if candidate and candidate:IsA("Model") then
+                            local health, _, hitbox = tabs.boss.getBossData(candidate)
+                            if hitbox and health and health > 0 then
+                                currentBosses[candidate] = hitbox.Position
                             end
                         end
                     end
 
-                    if bossDead then
-                        task.wait(1.5)
-                        local char = lp.player.Character or lp.player.CharacterAdded:Wait()
-                        local hrp = char:WaitForChild("HumanoidRootPart")
+                    -- ¿Desapareció o murió el jefe del tick anterior?
+                    for oldBoss, oldPos in pairs(lastBosses) do
+                        if not currentBosses[oldBoss] then
+                            deathPos = oldPos
+                            break
+                        end
+                    end
+                    
+                    lastBosses = currentBosses
+
+                    -- ¡El Jefe murió! Buscar Cofre en la zona.
+                    if deathPos then
+                        task.wait(1.5) -- Esperar a que el juego aparezca el cofre
                         
-                        local spawnsFolder = services.Workspace:FindFirstChild("spawnsFolder")
-                        local chestRoot = spawnsFolder and spawnsFolder:FindFirstChild("Root")
-                        local chestPrompt = chestRoot and chestRoot:FindFirstChild("bossChestPrompt")
-                        
-                        if chestRoot then
-                            hrp.CFrame = chestRoot.CFrame * CFrame.new(0, 3, 0)
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            task.wait(0.2)
-                            
-                            if chestPrompt then
-                                if fireproximityprompt then
-                                    fireproximityprompt(chestPrompt, 1)
-                                else
-                                    chestPrompt.HoldDuration = 0
-                                    chestPrompt:InputHoldBegin()
-                                    task.wait(0.1)
-                                    chestPrompt:InputHoldEnd()
+                        local collected = false
+                        for _, prompt in ipairs(services.Workspace:GetDescendants()) do
+                            if prompt:IsA("ProximityPrompt") then
+                                local pName = prompt.Name:lower()
+                                local parentName = (prompt.Parent and prompt.Parent.Name:lower()) or ""
+                                
+                                if (pName:find("chest") or parentName:find("chest") or prompt.ActionText:lower():find("open")) then
+                                    local dist = (prompt.Parent.Position - deathPos).Magnitude
+                                    if dist <= 60 then
+                                        hrp.CFrame = prompt.Parent.CFrame * CFrame.new(0, 3, 0)
+                                        hrp.AssemblyLinearVelocity = Vector3.zero
+                                        task.wait(0.2)
+                                        
+                                        if fireproximityprompt then
+                                            fireproximityprompt(prompt, 1)
+                                        else
+                                            prompt.HoldDuration = 0
+                                            prompt:InputHoldBegin()
+                                            task.wait(0.1)
+                                            prompt:InputHoldEnd()
+                                        end
+                                        collected = true
+                                        task.wait(1)
+                                    end
                                 end
                             end
-                        else
-                            hrp.CFrame = CFrame.new(tabs.boss.AutoChestData.TargetPos)
                         end
                         
-                        task.wait(3)
+                        -- Respaldo de Seguridad: Spam de tecla 'E' en la tumba del jefe
+                        if not collected then
+                            hrp.CFrame = CFrame.new(deathPos) * CFrame.new(0, 2, 0)
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            task.wait(0.2)
+                            for i = 1, 5 do
+                                services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                                task.wait(0.1)
+                                services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                                task.wait(0.2)
+                            end
+                        end
                     end
                 end)
                 task.wait(0.5)
