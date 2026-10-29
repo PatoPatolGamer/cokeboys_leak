@@ -890,12 +890,10 @@ tabs.fullRebirth.Tracker = {
     Active = false,
     TargetRebirths = 0,
     StartRebirths = 0,
-    StartTime = 0,
-    LastRebirths = 0,
-    LastTick = 0
+    StartTime = 0
 }
 
-tabs.fullRebirth:AddLabel("GOALS & TRACKER")
+tabs.fullRebirth:AddLabel("GOALS")
 tabs.fullRebirth:AddTextBox("Target Rebirths:", function(val)
     local num = tonumber(val)
     if num then 
@@ -903,87 +901,76 @@ tabs.fullRebirth:AddTextBox("Target Rebirths:", function(val)
     end
 end, {clear = false})
 
-local trackerSwitchRef = tabs.fullRebirth:AddSwitch("Enable Calculator (Works with Native)", function(state)
+tabs.fullRebirth:AddLabel("SETTINGS")
+local trackerSwitchRef = tabs.fullRebirth:AddSwitch("Enable Calculator", function(state)
     tabs.fullRebirth.Tracker.Active = state
     if state then
         tabs.fullRebirth.Tracker.StartRebirths = tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value
-        tabs.fullRebirth.Tracker.LastRebirths = tabs.fullRebirth.Tracker.StartRebirths
         tabs.fullRebirth.Tracker.StartTime = tick()
-        tabs.fullRebirth.Tracker.LastTick = tick()
         
         tabs.fullRebirth.AvgTimeLabel.Text = "Pace: Calculating..."
         tabs.fullRebirth.EtaLabel.Text = "ETA: Calculating..."
     else
-        tabs.fullRebirth.FastRebirthV2Speed.Text = "Speed: --/s"
         tabs.fullRebirth.AvgTimeLabel.Text = "Pace: Inactive"
         tabs.fullRebirth.EtaLabel.Text = "ETA: 0d 0h 0m 0s"
     end
 end)
 trackerSwitchRef:Set(false)
 
-tabs.fullRebirth:AddLabel("PET PHASES (SCRIPT REBIRTH ONLY)")
-tabs.fullRebirth:AddSwitch("Phase 1: Farm", function(state) tabs.fullRebirth.FastRebirthV2Data.UseFarmPets = state end):Set(true)
-tabs.fullRebirth:AddSwitch("Phase 2: Packs", function(state) tabs.fullRebirth.FastRebirthV2Data.UsePackPets = state end):Set(true)
-tabs.fullRebirth:AddSwitch("Phase 3: Combat/Golems", function(state) tabs.fullRebirth.FastRebirthV2Data.UseGolems = state end):Set(true)
+tabs.fullRebirth:AddSwitch("Use Farm Pets", function(state) tabs.fullRebirth.FastRebirthV2Data.UseFarmPets = state end):Set(true)
+tabs.fullRebirth:AddSwitch("Use Rebirth Pets", function(state) tabs.fullRebirth.FastRebirthV2Data.UsePackPets = state end):Set(true)
+tabs.fullRebirth:AddSwitch("Use Combat Pets", function(state) tabs.fullRebirth.FastRebirthV2Data.UseGolems = state end):Set(true)
 
 tabs.fullRebirth:AddLabel("STATUS")
-tabs.fullRebirth.FastRebirthV2Status = tabs.fullRebirth:AddLabel("Script Rebirth: Inactive")
+tabs.fullRebirth.FastRebirthV2Status = tabs.fullRebirth:AddLabel("Status: Inactive")
 tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 tabs.fullRebirth.FastRebirthV2Stats = tabs.fullRebirth:AddLabel("Rebirths: 0 | Gained: 0")
-tabs.fullRebirth.FastRebirthV2Speed = tabs.fullRebirth:AddLabel("Speed: --/s")
-tabs.fullRebirth.MissingLabel = tabs.fullRebirth:AddLabel("Missing Rebirths: 0")
+tabs.fullRebirth.MissingLabel = tabs.fullRebirth:AddLabel("Missing: 0")
 tabs.fullRebirth.AvgTimeLabel = tabs.fullRebirth:AddLabel("Pace: Inactive")
 tabs.fullRebirth.EtaLabel = tabs.fullRebirth:AddLabel("ETA: 0d 0h 0m 0s")
 tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 
 local autoRebirthToggleRef = nil
 
--- Bucle Independiente de la Calculadora
+-- Bucle Independiente de la Calculadora suavizada
 task.spawn(function()
     while utils.isCurrent() do
         local currentRebirths = tabs.fullRebirth.FastRebirthV2Data.Rebirths.Value
         
         if tabs.fullRebirth.Tracker.Active then
-            local now = tick()
             local totalGained = currentRebirths - tabs.fullRebirth.Tracker.StartRebirths
             tabs.fullRebirth.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(currentRebirths) .. " | Gained: " .. utils.formatWithCommas(totalGained)
 
-            -- Actualización de métricas (1 vez por segundo)
-            if now - tabs.fullRebirth.Tracker.LastTick >= 1 then
-                local gainedPerSec = currentRebirths - tabs.fullRebirth.Tracker.LastRebirths
-                tabs.fullRebirth.FastRebirthV2Speed.Text = "Speed: " .. utils.formatWithCommas(gainedPerSec) .. " rebirths/s"
-                tabs.fullRebirth.Tracker.LastRebirths = currentRebirths
-                tabs.fullRebirth.Tracker.LastTick = now
-
-                if totalGained > 0 then
-                    local secElapsed = now - tabs.fullRebirth.Tracker.StartTime
-                    local avgSecPerRb = secElapsed / totalGained
-                    tabs.fullRebirth.AvgTimeLabel.Text = string.format("Pace: %.2f s/rebirth", avgSecPerRb)
+            -- Solo calculamos la velocidad general si hemos ganado rebirths
+            if totalGained > 0 then
+                local now = tick()
+                local secElapsed = now - tabs.fullRebirth.Tracker.StartTime
+                local avgSecPerRb = secElapsed / totalGained
+                
+                tabs.fullRebirth.AvgTimeLabel.Text = string.format("Pace: %.2f s/rebirth", avgSecPerRb)
+                
+                if tabs.fullRebirth.Tracker.TargetRebirths > 0 then
+                    local missing = math.max(0, tabs.fullRebirth.Tracker.TargetRebirths - currentRebirths)
+                    tabs.fullRebirth.MissingLabel.Text = "Missing: " .. utils.formatWithCommas(missing)
                     
-                    if tabs.fullRebirth.Tracker.TargetRebirths > 0 then
-                        local missing = math.max(0, tabs.fullRebirth.Tracker.TargetRebirths - currentRebirths)
-                        tabs.fullRebirth.MissingLabel.Text = "Missing: " .. utils.formatWithCommas(missing)
-                        
-                        local etaSec = missing * avgSecPerRb
-                        tabs.fullRebirth.EtaLabel.Text = string.format("ETA: %dd %dh %dm %ds", math.floor(etaSec / 86400), math.floor((etaSec % 86400) / 3600), math.floor((etaSec % 3600) / 60), math.floor(etaSec % 60))
-                        
-                        -- Detener el Script Rebirth si se alcanza la meta
-                        if currentRebirths >= tabs.fullRebirth.Tracker.TargetRebirths and tabs.fullRebirth.FastRebirthV2Data.Running then
-                            if autoRebirthToggleRef and autoRebirthToggleRef.Set then
-                                autoRebirthToggleRef:Set(false)
-                            end
+                    local etaSec = missing * avgSecPerRb
+                    tabs.fullRebirth.EtaLabel.Text = string.format("ETA: %dd %dh %dm %ds", math.floor(etaSec / 86400), math.floor((etaSec % 86400) / 3600), math.floor((etaSec % 3600) / 60), math.floor(etaSec % 60))
+                    
+                    -- Detener el Script Rebirth si se alcanza la meta
+                    if currentRebirths >= tabs.fullRebirth.Tracker.TargetRebirths and tabs.fullRebirth.FastRebirthV2Data.Running then
+                        if autoRebirthToggleRef and autoRebirthToggleRef.Set then
+                            autoRebirthToggleRef:Set(false)
                         end
-                    else
-                        tabs.fullRebirth.MissingLabel.Text = "Missing: Infinite"
-                        tabs.fullRebirth.EtaLabel.Text = "ETA: 0d 0h 0m 0s"
                     end
+                else
+                    tabs.fullRebirth.MissingLabel.Text = "Missing: Infinite"
+                    tabs.fullRebirth.EtaLabel.Text = "ETA: 0d 0h 0m 0s"
                 end
             end
         else
-            -- Si la calculadora está apagada, solo muestra los Rebirths actuales sin calcular Gained
             tabs.fullRebirth.FastRebirthV2Stats.Text = "Rebirths: " .. utils.formatWithCommas(currentRebirths) .. " | Gained: 0"
         end
-        task.wait(0.1)
+        task.wait(0.5)
     end
 end)
 
@@ -1055,14 +1042,14 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
     
     while utils.isCurrent() and data.Running do
         if tabs.fullRebirth.Tracker.TargetRebirths > 0 and data.Rebirths.Value >= tabs.fullRebirth.Tracker.TargetRebirths then
-            tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Target reached!"
+            tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Target reached!"
             tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
             data.Running = false
             break
         end
         
         if data.UseFarmPets then
-            tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Equipping speed pets..."
+            tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Equipping speed pets..."
             tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
             pcall(function() tabs.fullRebirth.equipDynamicPets("Farm", 12) end)
             task.wait(0.2)
@@ -1072,7 +1059,7 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
         local targetStrength = 5000 + currentRebirths * 2550
         local repsPerBurst = lp.player.MembershipType == Enum.MembershipType.Premium and 6 or 12
         
-        tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Farming... " .. utils.formatNumber(data.Strength.Value) .. " / " .. utils.formatNumber(targetStrength)
+        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Farming... " .. utils.formatNumber(data.Strength.Value) .. " / " .. utils.formatNumber(targetStrength)
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         
         while utils.isCurrent() and data.Running and data.Strength.Value < targetStrength do
@@ -1087,20 +1074,20 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
         if utils.isCurrent() and data.Running and data.Strength.Value >= targetStrength then
             
             if data.UsePackPets then
-                tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Equipping rebirth pets..."
+                tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Equipping rebirth pets..."
                 tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 150, 255)
                 pcall(function() tabs.fullRebirth.equipDynamicPets("Rebirth", 12) end)
                 task.wait(0.3)
             end
             
-            tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Rebirthing..."
+            tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Rebirthing..."
             tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 200, 80)
             
             pcall(function() services.ReplicatedStorage.rEvents.rebirthRemote:InvokeServer("rebirthRequest") end)
             task.wait(0.15)
             
             if data.UseGolems then
-                tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Equipping combat pets..."
+                tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Equipping combat pets..."
                 tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(150, 200, 255)
                 pcall(function() tabs.fullRebirth.equipDynamicPets("Combat", 12) end)
                 task.wait(0.2)
@@ -1111,7 +1098,7 @@ tabs.fullRebirth.FastRebirthV2Worker = function()
 end
 
 tabs.fullRebirth:AddLabel("CONTROL")
-autoRebirthToggleRef = tabs.fullRebirth:AddSwitch("Script Auto Rebirth (With Pets)", function(state)
+autoRebirthToggleRef = tabs.fullRebirth:AddSwitch("Auto Rebirth", function(state)
     tabs.fullRebirth.FastRebirthV2Data.Running = state
     if state then
         -- Si enciendes el Script Auto Rebirth, la calculadora se enciende sola automáticamente.
@@ -1119,14 +1106,14 @@ autoRebirthToggleRef = tabs.fullRebirth:AddSwitch("Script Auto Rebirth (With Pet
             trackerSwitchRef:Set(true)
         end
         
-        tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Starting..."
+        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Starting..."
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         if not tabs.fullRebirth.FastRebirthV2Data.WorkerActive then
             tabs.fullRebirth.FastRebirthV2Data.WorkerActive = true
             task.spawn(tabs.fullRebirth.FastRebirthV2Worker)
         end
     else
-        tabs.fullRebirth.FastRebirthV2Status.Text = "Script Rebirth: Inactive"
+        tabs.fullRebirth.FastRebirthV2Status.Text = "Status: Inactive"
         tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
     end
 end)
@@ -1292,6 +1279,13 @@ tabs.configs:AddSwitch("Farm Halloween Squat", function(state)
         pcall(function() utils.remotes.MachineInteract:InvokeServer("leaveMachine") end)
     end
     if tabs.fullFarm and tabs.fullFarm.FastRepToggle then tabs.fullFarm.FastRepToggle:Set(state) end
+end):Set(false)
+
+tabs.configs:AddLabel("ZONE REBIRTH")
+tabs.configs:AddSwitch("Auto Rebirth (Zones)", function(state)
+    if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
+        tabs.fullRebirth.FastRebirthV2Toggle:Set(state)
+    end
 end):Set(false)
 
 -- ==========================================
