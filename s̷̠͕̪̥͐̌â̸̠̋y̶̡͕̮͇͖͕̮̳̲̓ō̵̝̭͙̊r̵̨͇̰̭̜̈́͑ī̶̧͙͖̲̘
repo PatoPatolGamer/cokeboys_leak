@@ -109,7 +109,7 @@ if not verified then
     submitButton.Size = UDim2.new(0.85, 0, 0, 42)
     submitButton.Position = UDim2.new(0.5, 0, 0.53, 0)
     submitButton.AnchorPoint = Vector2.new(0.5, 0)
-    submitButton.Text = "Verificar Key"
+    submitButton.Text = "Submit Key"
     submitButton.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
     submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     submitButton.Font = Enum.Font.GothamBold
@@ -124,7 +124,7 @@ if not verified then
     getKeyButton.Size = UDim2.new(0.85, 0, 0, 42)
     getKeyButton.Position = UDim2.new(0.5, 0, 0.73, 0)
     getKeyButton.AnchorPoint = Vector2.new(0.5, 0)
-    getKeyButton.Text = "OBTENER KEY"
+    getKeyButton.Text = "Get Key"
     getKeyButton.BackgroundColor3 = Color3.fromRGB(138, 43, 226)
     getKeyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
     getKeyButton.Font = Enum.Font.GothamBold
