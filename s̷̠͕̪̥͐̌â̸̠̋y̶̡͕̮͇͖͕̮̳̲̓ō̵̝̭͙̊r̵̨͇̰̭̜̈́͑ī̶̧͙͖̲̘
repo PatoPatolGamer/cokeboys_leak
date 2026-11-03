@@ -1942,9 +1942,10 @@ tabs.race.CFG = {
 
     spawnPos = Vector3.new(-12640, 6, -4197),
     spawnRadius = 10,
-    wallPos = Vector3.new(-13549, 6, -4192),
+    startLineXTrigger = -12880,
+    wallPos = Vector3.new(-13370, 10, -4144),
     wallSize = Vector3.new(5, 20, 180),
-    wallX = -13500,
+    wallX = -13370,
     
     tpLiftX = -13742,
     tpWrestleX = -13840,
@@ -2098,31 +2099,42 @@ local function moveRaceToWithJumps(pos, jumpCoords, activeCheck)
     if endHum then endHum:Move(Vector3.zero) end
 end
 
-local function getRaceLane(folder, hrp)
-    local bestLane = nil
-    local minDist = math.huge
-    for _, lane in ipairs(folder:GetChildren()) do
-        local segs = lane:FindFirstChild("Segments")
-        if segs then
-            local startSeg = segs:FindFirstChild("01_AgilityDash")
-            local targetPart = getRacePart(startSeg)
-            if targetPart then
-                local dist = (hrp.Position - targetPart.Position).Magnitude
-                if dist < minDist then
-                    minDist = dist
-                    bestLane = lane
-                end
-            end
+local function getRaceLaneByPosition(hrp)
+    if not hrp then return nil, 1 end
+    local charZ = hrp.Position.Z
+    local bestLaneNum = 1
+    local minZDist = math.huge
+    
+    for laneNum, coord in pairs(tabs.race.CFG.laneCoords) do
+        local dist = math.abs(charZ - coord.Z)
+        if dist < minZDist then
+            minZDist = dist
+            bestLaneNum = laneNum
         end
     end
-    return bestLane
+    
+    local gym = services.Workspace:FindFirstChild("StrongbloxianGym")
+    local course = gym and gym:FindFirstChild("Course")
+    local lanes = course and course:FindFirstChild("Lanes")
+    
+    if lanes then
+        for _, lane in ipairs(lanes:GetChildren()) do
+            local num = tonumber(string.match(lane.Name, "%d+"))
+            if num == bestLaneNum then
+                return lane, bestLaneNum
+            end
+        end
+        return lanes:GetChildren()[bestLaneNum] or lanes:GetChildren()[1], bestLaneNum
+    end
+    
+    return nil, bestLaneNum
 end
 
 tabs.race.wallObj = nil
 tabs.race.passCount = 0
 tabs.race.wallChecking = false
 
-local function createWall()
+local function createRaceWall()
     if not tabs.race.CFG.activeTp then return end
     if tabs.race.wallObj and tabs.race.wallObj.Parent then
         tabs.race.wallObj.CanCollide = true
@@ -2140,7 +2152,7 @@ local function createWall()
     tabs.race.passCount = 0
 end
 
-local function clearWall()
+local function clearRaceWall()
     if tabs.race.wallObj then
         tabs.race.wallObj.CanCollide = false
         tabs.race.wallObj:Destroy()
@@ -2150,7 +2162,7 @@ local function clearWall()
     tabs.race.wallChecking = false
 end
 
-local function checkWall()
+local function checkRaceWall()
     if tabs.race.wallChecking then return end
     tabs.race.wallChecking = true
     task.spawn(function()
@@ -2164,7 +2176,7 @@ local function checkWall()
                     inZone = true
                     tabs.race.passCount = tabs.race.passCount + 1
                     if tabs.race.passCount >= 2 then
-                        clearWall()
+                        clearRaceWall()
                         break
                     end
                 elseif dist > 14 and inZone then
@@ -2198,13 +2210,10 @@ task.spawn(function()
     local lastLaneName = ""
     while utils.isCurrent() do
         if tabs.race.CFG.activeNormal or tabs.race.CFG.activeTp then
-            local gym = services.Workspace:FindFirstChild("StrongbloxianGym")
-            local course = gym and gym:FindFirstChild("Course")
-            local lanes = course and course:FindFirstChild("Lanes")
             local _, hrp = getRaceChar()
-            if lanes and hrp then
-                local curLane = getRaceLane(lanes, hrp)
-                local currentLaneName = curLane and curLane.Name or "Ninguno"
+            if hrp then
+                local _, laneNum = getRaceLaneByPosition(hrp)
+                local currentLaneName = "Lane " .. laneNum
                 if currentLaneName ~= lastLaneName then
                     lastLaneName = currentLaneName
                     tabs.race.LaneLabel.Text = "Carril Detectado: " .. currentLaneName
@@ -2243,70 +2252,69 @@ switchNormal = tabs.race:AddSwitch("Auto Race Normal", function(state)
                         tpRace(queueZone.CFrame + Vector3.new(0, 3, 0))
                     end
                     
-                    tabs.race.StatusNormal.Text = "Estado: Esperando asignación..."
-                    local t = 0
-                    while t < 4 and utils.isCurrent() do
-                        if not tabs.race.CFG.activeNormal then break end
+                    tabs.race.StatusNormal.Text = "Estado: Esperando inicio de carrera en la línea de salida..."
+                    local curLane, laneNum = nil, 1
+                    while tabs.race.CFG.activeNormal and utils.isCurrent() do
+                        local _, currentHrp = getRaceChar()
+                        if currentHrp and currentHrp.Position.X <= tabs.race.CFG.startLineXTrigger then
+                            curLane, laneNum = getRaceLaneByPosition(currentHrp)
+                            break
+                        end
                         task.wait(0.1)
-                        t = t + 0.1
                     end
                     if not tabs.race.CFG.activeNormal then break end
                     
                     local course = gym:FindFirstChild("Course")
-                    local lanes = course and course:FindFirstChild("Lanes")
-                    if lanes then
-                        local curLane = getRaceLane(lanes, hrp)
-                        if curLane then
-                            tabs.race.StatusNormal.Text = "Estado: Saltando vallas..."
-                            hum.PlatformStand = false
-                            hum.WalkSpeed = tabs.race.CFG.normalSpeed
-                            
-                            moveRaceToWithJumps(tabs.race.CFG.laneCoords[tonumber(string.match(curLane.Name, "%d+")) or 1], tabs.race.CFG.jumpCoords, function() return tabs.race.CFG.activeNormal end)
-                            if not tabs.race.CFG.activeNormal then break end
-                            
-                            tabs.race.StatusNormal.Text = "Estado: Arrastrando Trineo..."
-                            hum.WalkSpeed = tabs.race.CFG.normalSpeed
-                            local liftSeg = getRacePart(curLane.Segments:FindFirstChild("03_HeavyLift"))
-                            if liftSeg then moveRaceTo(liftSeg.Position, function() return tabs.race.CFG.activeNormal end) end
-                            if not tabs.race.CFG.activeNormal then break end
-                            
-                            local clicking = true
-                            task.spawn(function()
-                                local delayTime = 1 / tabs.race.CFG.cps
-                                while tabs.race.CFG.activeNormal and clicking and utils.isCurrent() do
-                                    doRaceClick()
-                                    task.wait(delayTime)
-                                end
-                            end)
-                            
-                            tabs.race.StatusNormal.Text = "Estado: Levantando Pesa..."
-                            hum.WalkSpeed = tabs.race.CFG.liftSpeed
-                            if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
-                            task.wait(0.2)
-                            
-                            local wrestleSeg = getRacePart(curLane.Segments:FindFirstChild("04_ArmWrestle"))
-                            if wrestleSeg then moveRaceTo(wrestleSeg.Position, function() return tabs.race.CFG.activeNormal end) end
-                            
-                            if tabs.race.CFG.activeNormal and wrestleSeg then
-                                tabs.race.StatusNormal.Text = "Estado: Compitiendo en Pulso..."
-                                tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
-                                task.wait(0.2)
-                            end
-                            
-                            if tabs.race.CFG.activeNormal then
-                                tabs.race.StatusNormal.Text = "Estado: ¡Sprint a Meta!"
-                                hum.WalkSpeed = tabs.race.CFG.runSpeed
-                                local finishGate = course:FindFirstChild("FinishGate")
-                                local finishPos = getRacePart(finishGate) and getRacePart(finishGate).Position
-                                if finishPos then moveRaceTo(finishPos, function() return tabs.race.CFG.activeNormal end) end
-                            end
-                            
-                            clicking = false
-                            tabs.race.StatusNormal.Text = "Estado: ¡Carrera Completada!"
-                            resetRaceSpeed()
-                            task.wait(2)
+                    
+                    tabs.race.StatusNormal.Text = "Estado: Saltando vallas (Carril " .. laneNum .. ")..."
+                    hum.PlatformStand = false
+                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
+                    
+                    moveRaceToWithJumps(tabs.race.CFG.laneCoords[laneNum], tabs.race.CFG.jumpCoords, function() return tabs.race.CFG.activeNormal end)
+                    if not tabs.race.CFG.activeNormal then break end
+                    
+                    tabs.race.StatusNormal.Text = "Estado: Arrastrando Trineo..."
+                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
+                    local liftSeg = curLane and getRacePart(curLane.Segments:FindFirstChild("03_HeavyLift"))
+                    if liftSeg then moveRaceTo(liftSeg.Position, function() return tabs.race.CFG.activeNormal end) end
+                    if not tabs.race.CFG.activeNormal then break end
+                    
+                    local clicking = true
+                    task.spawn(function()
+                        local delayTime = 1 / tabs.race.CFG.cps
+                        while tabs.race.CFG.activeNormal and clicking and utils.isCurrent() do
+                            doRaceClick()
+                            task.wait(delayTime)
                         end
+                    end)
+                    
+                    tabs.race.StatusNormal.Text = "Estado: Levantando Pesa..."
+                    hum.WalkSpeed = tabs.race.CFG.liftSpeed
+                    if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
+                    task.wait(0.2)
+                    
+                    local wrestleSeg = curLane and getRacePart(curLane.Segments:FindFirstChild("04_ArmWrestle"))
+                    if wrestleSeg then moveRaceTo(wrestleSeg.Position, function() return tabs.race.CFG.activeNormal end) end
+                    
+                    if tabs.race.CFG.activeNormal and wrestleSeg then
+                        tabs.race.StatusNormal.Text = "Estado: Compitiendo en Pulso..."
+                        tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
+                        task.wait(0.2)
                     end
+                    
+                    if tabs.race.CFG.activeNormal then
+                        tabs.race.StatusNormal.Text = "Estado: ¡Sprint a Meta!"
+                        hum.WalkSpeed = tabs.race.CFG.runSpeed
+                        local finishGate = course and course:FindFirstChild("FinishGate")
+                        local fallbackFinish = getRacePart(finishGate) and getRacePart(finishGate).Position
+                        local finishPos = tabs.race.CFG.finishCoords[laneNum] or fallbackFinish
+                        if finishPos then moveRaceTo(finishPos, function() return tabs.race.CFG.activeNormal end) end
+                    end
+                    
+                    clicking = false
+                    tabs.race.StatusNormal.Text = "Estado: ¡Carrera Completada!"
+                    resetRaceSpeed()
+                    task.wait(2)
                 end
                 task.wait(2)
             end
@@ -2348,153 +2356,145 @@ switchTp = tabs.race:AddSwitch("Auto Race TP", function(state)
                         tpRace(queueZone.CFrame + Vector3.new(0, 3, 0))
                     end
                     
-                    tabs.race.StatusTp.Text = "Estado: Esperando asignación..."
-                    local t = 0
-                    while t < 4 and utils.isCurrent() do
-                        if not tabs.race.CFG.activeTp then break end
+                    tabs.race.StatusTp.Text = "Estado: Esperando inicio de carrera en la línea de salida..."
+                    local curLane, laneNum = nil, 1
+                    while tabs.race.CFG.activeTp and utils.isCurrent() do
+                        local _, currentHrp = getRaceChar()
+                        if currentHrp and currentHrp.Position.X <= tabs.race.CFG.startLineXTrigger then
+                            curLane, laneNum = getRaceLaneByPosition(currentHrp)
+                            break
+                        end
                         task.wait(0.1)
-                        t = t + 0.1
                     end
                     if not tabs.race.CFG.activeTp then break end
                     
                     local course = gym:FindFirstChild("Course")
-                    local lanes = course and course:FindFirstChild("Lanes")
                     local finishGate = course and course:FindFirstChild("FinishGate")
+                    local segs = curLane and curLane:FindFirstChild("Segments")
                     
-                    if lanes then
-                        local curLane = getRaceLane(lanes, hrp)
-                        if curLane then
-                            local segs = curLane:FindFirstChild("Segments")
-                            if segs then
-                                local sledSeg = getRacePart(segs:FindFirstChild("02_HeavySled"))
-                                local liftSeg = getRacePart(segs:FindFirstChild("03_HeavyLift"))
-                                local wrestleSeg = getRacePart(segs:FindFirstChild("04_ArmWrestle"))
-                                local fallbackFinish = getRacePart(finishGate)
-                                
-                                if liftSeg and wrestleSeg then
-                                    local laneNum = tonumber(string.match(curLane.Name, "%d+")) or 1
-                                    local targetPos = tabs.race.CFG.laneCoords[laneNum]
-                                    local finishPos = tabs.race.CFG.finishCoords[laneNum] or (fallbackFinish and fallbackFinish.Position)
-                                    
-                                    if laneNum == 6 or string.find(curLane.Name:lower(), "06") then
-                                        clearWall()
-                                    else
-                                        createWall()
-                                        checkWall()
-                                    end
-                                    
-                                    tabs.race.StatusTp.Text = "Estado: TP Sección 1..."
-                                    hum.PlatformStand = true
-                                    if targetPos then tpRace(CFrame.new(targetPos)) elseif sledSeg then tpRace(sledSeg.CFrame + Vector3.new(0, 3, 0)) end
-                                    task.wait(0.2)
-                                    hum.PlatformStand = false
-                                    
-                                    local pauseSec = 5
-                                    while pauseSec > 0 and utils.isCurrent() do
-                                        if not tabs.race.CFG.activeTp then break end
-                                        tabs.race.StatusTp.Text = "Estado: Pausa (" .. pauseSec .. "s)..."
-                                        task.wait(1)
-                                        pauseSec = pauseSec - 1
-                                    end
-                                    if not tabs.race.CFG.activeTp then break end
-                                    
-                                    tabs.race.StatusTp.Text = "Estado: Arrastrando Trineo..."
-                                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
-                                    task.wait(0.5)
-                                    
-                                    local tpLiftTriggered = false
-                                    task.spawn(function()
-                                        while tabs.race.CFG.activeTp and not tpLiftTriggered and utils.isCurrent() do
-                                            local _, currentHrp = getRaceChar()
-                                            if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpLiftX then
-                                                tpLiftTriggered = true
-                                                tabs.race.StatusTp.Text = "Estado: TP a Levantamiento..."
-                                                tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0))
-                                                break
-                                            end
-                                            task.wait(0.05)
-                                        end
-                                    end)
-                                    moveRaceTo(liftSeg.Position, function() return tabs.race.CFG.activeTp end)
-                                    tpLiftTriggered = true
-                                    
-                                    if not tabs.race.CFG.activeTp then break end
-                                    
-                                    local clicking = true
-                                    task.spawn(function()
-                                        while tabs.race.CFG.activeTp and clicking and utils.isCurrent() do
-                                            for _ = 1, 3 do doRaceClick() end
-                                            task.wait()
-                                        end
-                                    end)
-                                    
-                                    tabs.race.StatusTp.Text = "Estado: Levantando Pesa (Autoclick)..."
-                                    hum.WalkSpeed = tabs.race.CFG.liftSpeed
-                                    tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0))
-                                    task.wait(0.2)
-                                    
-                                    local tpWrestleTriggered = false
-                                    task.spawn(function()
-                                        while tabs.race.CFG.activeTp and not tpWrestleTriggered and utils.isCurrent() do
-                                            local _, currentHrp = getRaceChar()
-                                            if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpWrestleX then
-                                                tpWrestleTriggered = true
-                                                tabs.race.StatusTp.Text = "Estado: TP a Pulso..."
-                                                tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
-                                                break
-                                            end
-                                            task.wait(0.05)
-                                        end
-                                    end)
-                                    moveRaceTo(wrestleSeg.Position, function() return tabs.race.CFG.activeTp end)
-                                    tpWrestleTriggered = true
-                                    
-                                    if tabs.race.CFG.activeTp then
-                                        tabs.race.StatusTp.Text = "Estado: Compitiendo en Pulso..."
-                                        tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
-                                        task.wait(0.2)
-                                    end
-                                    
-                                    if tabs.race.CFG.activeTp then
-                                        tabs.race.StatusTp.Text = "Estado: ¡Sprint Final a Meta!"
-                                        hum.WalkSpeed = tabs.race.CFG.runSpeed
-                                        if finishPos then
-                                            local tpFinishTriggered = false
-                                            task.spawn(function()
-                                                while tabs.race.CFG.activeTp and not tpFinishTriggered and utils.isCurrent() do
-                                                    local _, currentHrp = getRaceChar()
-                                                    if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpFinishX then
-                                                        tpFinishTriggered = true
-                                                        tabs.race.StatusTp.Text = "Estado: TP Instantáneo a Meta..."
-                                                        tpRace(CFrame.new(finishPos))
-                                                        break
-                                                    end
-                                                    task.wait(0.05)
-                                                end
-                                            end)
-                                            moveRaceTo(finishPos, function() return tabs.race.CFG.activeTp end)
-                                            tpFinishTriggered = true
-                                        end
-                                    end
-                                    
-                                    clicking = false
-                                    clearWall()
-                                    tabs.race.StatusTp.Text = "Estado: ¡Carrera Completada!"
-                                    resetRaceSpeed()
-                                    task.wait(2)
-                                end
+                    local sledSeg = segs and getRacePart(segs:FindFirstChild("02_HeavySled"))
+                    local liftSeg = segs and getRacePart(segs:FindFirstChild("03_HeavyLift"))
+                    local wrestleSeg = segs and getRacePart(segs:FindFirstChild("04_ArmWrestle"))
+                    local fallbackFinish = getRacePart(finishGate)
+                    
+                    local targetPos = tabs.race.CFG.laneCoords[laneNum]
+                    local finishPos = tabs.race.CFG.finishCoords[laneNum] or (fallbackFinish and fallbackFinish.Position)
+                    
+                    if laneNum == 6 then
+                        clearRaceWall()
+                    else
+                        createRaceWall()
+                        checkRaceWall()
+                    end
+                    
+                    tabs.race.StatusTp.Text = "Estado: TP Sección 1 (Carril " .. laneNum .. ")..."
+                    hum.PlatformStand = true
+                    if targetPos then tpRace(CFrame.new(targetPos)) elseif sledSeg then tpRace(sledSeg.CFrame + Vector3.new(0, 3, 0)) end
+                    task.wait(0.2)
+                    hum.PlatformStand = false
+                    
+                    local pauseSec = 5
+                    while pauseSec > 0 and utils.isCurrent() do
+                        if not tabs.race.CFG.activeTp then break end
+                        tabs.race.StatusTp.Text = "Estado: Pausa (" .. pauseSec .. "s)..."
+                        task.wait(1)
+                        pauseSec = pauseSec - 1
+                    end
+                    if not tabs.race.CFG.activeTp then break end
+                    
+                    tabs.race.StatusTp.Text = "Estado: Arrastrando Trineo..."
+                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
+                    task.wait(0.5)
+                    
+                    local tpLiftTriggered = false
+                    task.spawn(function()
+                        while tabs.race.CFG.activeTp and not tpLiftTriggered and utils.isCurrent() do
+                            local _, currentHrp = getRaceChar()
+                            if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpLiftX then
+                                tpLiftTriggered = true
+                                tabs.race.StatusTp.Text = "Estado: TP a Levantamiento..."
+                                if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
+                                break
                             end
+                            task.wait(0.05)
+                        end
+                    end)
+                    if liftSeg then moveRaceTo(liftSeg.Position, function() return tabs.race.CFG.activeTp end) end
+                    tpLiftTriggered = true
+                    
+                    if not tabs.race.CFG.activeTp then break end
+                    
+                    local clicking = true
+                    task.spawn(function()
+                        while tabs.race.CFG.activeTp and clicking and utils.isCurrent() do
+                            for _ = 1, 3 do doRaceClick() end
+                            task.wait()
+                        end
+                    end)
+                    
+                    tabs.race.StatusTp.Text = "Estado: Levantando Pesa (Autoclick)..."
+                    hum.WalkSpeed = tabs.race.CFG.liftSpeed
+                    if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
+                    task.wait(0.2)
+                    
+                    local tpWrestleTriggered = false
+                    task.spawn(function()
+                        while tabs.race.CFG.activeTp and not tpWrestleTriggered and utils.isCurrent() do
+                            local _, currentHrp = getRaceChar()
+                            if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpWrestleX then
+                                tpWrestleTriggered = true
+                                tabs.race.StatusTp.Text = "Estado: TP a Pulso..."
+                                if wrestleSeg then tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0)) end
+                                break
+                            end
+                            task.wait(0.05)
+                        end
+                    end)
+                    if wrestleSeg then moveRaceTo(wrestleSeg.Position, function() return tabs.race.CFG.activeTp end) end
+                    tpWrestleTriggered = true
+                    
+                    if tabs.race.CFG.activeTp and wrestleSeg then
+                        tabs.race.StatusTp.Text = "Estado: Compitiendo en Pulso..."
+                        tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
+                        task.wait(0.2)
+                    end
+                    
+                    if tabs.race.CFG.activeTp then
+                        tabs.race.StatusTp.Text = "Estado: ¡Sprint Final a Meta!"
+                        hum.WalkSpeed = tabs.race.CFG.runSpeed
+                        if finishPos then
+                            local tpFinishTriggered = false
+                            task.spawn(function()
+                                while tabs.race.CFG.activeTp and not tpFinishTriggered and utils.isCurrent() do
+                                    local _, currentHrp = getRaceChar()
+                                    if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpFinishX then
+                                        tpFinishTriggered = true
+                                        tabs.race.StatusTp.Text = "Estado: TP Instantáneo a Meta..."
+                                        tpRace(CFrame.new(finishPos))
+                                        break
+                                    end
+                                    task.wait(0.05)
+                                end
+                            end)
+                            moveRaceTo(finishPos, function() return tabs.race.CFG.activeTp end)
+                            tpFinishTriggered = true
                         end
                     end
+                    
+                    clicking = false
+                    clearRaceWall()
+                    tabs.race.StatusTp.Text = "Estado: ¡Carrera Completada!"
+                    resetRaceSpeed()
+                    task.wait(2)
                 end
                 task.wait(2)
             end
-            clearWall()
+            clearRaceWall()
             resetRaceSpeed()
             tabs.race.StatusTp.Text = "Estado: Inactivo"
         end)
     else
-        clearWall()
+        clearRaceWall()
         resetRaceSpeed()
         tabs.race.StatusTp.Text = "Estado: Inactivo"
     end
