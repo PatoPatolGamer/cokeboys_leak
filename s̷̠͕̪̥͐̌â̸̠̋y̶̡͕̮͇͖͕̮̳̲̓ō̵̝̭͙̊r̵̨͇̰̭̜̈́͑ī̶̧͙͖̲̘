@@ -1618,14 +1618,17 @@ tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", 
             end)
 
             if killed then
-                -- 1. Desactivar el switch del Boss de Halloween
+                -- 1. Desactivar el switch del Boss de Halloween inmediatamente
                 if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
                     tabs.boss.HalloweenBossToggle:Set(false)
                 else
                     tabs.boss.HalloweenData.Running = false
                 end
                 
-                -- 2. Teletransportarse a la tienda de Halloween y girar la ruleta
+                -- 2. Esperar 5 segundos manteniendo la función desactivada
+                task.wait(5)
+
+                -- 3. Teletransportarse a la tienda de Halloween y girar la ruleta
                 pcall(function()
                     local char = lp.player.Character
                     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1639,7 +1642,7 @@ tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", 
                     Event:InvokeServer("spin")
                 end)
 
-                -- 3. Esperar un momento y volver a activarlo automáticamente
+                -- 4. Esperar un momento adicional y volver a activar la opción automáticamente
                 task.wait(2)
                 if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
                     tabs.boss.HalloweenBossToggle:Set(true)
@@ -2213,7 +2216,7 @@ task.spawn(function()
 end)
 
 -- --- MODO NORMAL (SALTOS) ---
-tabs.race:AddLabel("NORMAL MODE")
+tabs.race:AddLabel("--- MODO NORMAL (SALTOS) ---")
 tabs.race.StatusNormal = tabs.race:AddLabel("Estado: Inactivo")
 
 local switchNormal = nil
@@ -2318,7 +2321,7 @@ end)
 switchNormal:Set(false)
 
 -- --- MODO RÁPIDO (TELETRANSPORTES) ---
-tabs.race:AddLabel("MODE TP")
+tabs.race:AddLabel("--- MODO RÁPIDO (TELETRANSPORTES) ---")
 tabs.race.StatusTp = tabs.race:AddLabel("Estado: Inactivo")
 
 local switchTp = nil
