@@ -2213,7 +2213,7 @@ task.spawn(function()
 end)
 
 -- --- MODO NORMAL (SALTOS) ---
-tabs.race:AddLabel("--- MODO NORMAL (SALTOS) ---")
+tabs.race:AddLabel("NORMAL MODE")
 tabs.race.StatusNormal = tabs.race:AddLabel("Estado: Inactivo")
 
 local switchNormal = nil
@@ -2318,7 +2318,7 @@ end)
 switchNormal:Set(false)
 
 -- --- MODO RÁPIDO (TELETRANSPORTES) ---
-tabs.race:AddLabel("--- MODO RÁPIDO (TELETRANSPORTES) ---")
+tabs.race:AddLabel("MODE TP")
 tabs.race.StatusTp = tabs.race:AddLabel("Estado: Inactivo")
 
 local switchTp = nil
