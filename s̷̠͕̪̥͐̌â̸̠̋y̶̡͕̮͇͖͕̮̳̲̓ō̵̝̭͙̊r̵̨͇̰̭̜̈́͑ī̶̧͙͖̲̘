@@ -578,7 +578,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (FILTRO EMA + MUESTREO SUAVIZADO)
+-- TAB: FAST FARM (RESTAURADO Y ULTRA-ESTABLE)
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -591,7 +591,7 @@ tabs.fullFarm.totalElapsed = 0
 tabs.fullFarm.timerStarted = false
 
 tabs.fullFarm.statHistory = {}
-tabs.fullFarm.windowSize = 12
+tabs.fullFarm.windowSize = 10 -- Propiedad original restaurada
 tabs.fullFarm.smoothedStrPace = 0
 tabs.fullFarm.smoothedDurPace = 0
 tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
@@ -675,7 +675,8 @@ local function getRollingPace()
     local rawStrPace = math.max(0, newest.str - oldest.str) / dt
     local rawDurPace = math.max(0, newest.dur - oldest.dur) / dt
     
-    local alpha = 0.15
+    -- Filtro de amortiguación extrema (alpha = 0.05) para estabilidad total
+    local alpha = 0.05
     if tabs.fullFarm.smoothedStrPace == 0 then
         tabs.fullFarm.smoothedStrPace = rawStrPace
         tabs.fullFarm.smoothedDurPace = rawDurPace
