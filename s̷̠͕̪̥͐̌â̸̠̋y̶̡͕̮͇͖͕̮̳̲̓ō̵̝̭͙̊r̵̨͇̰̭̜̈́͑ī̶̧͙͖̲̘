@@ -1938,7 +1938,7 @@ tabs.race.CFG = {
     cps = 30,
     
     clickXRatio = 0.05,
-    clickYRatio = 0.15,
+    clickYRatio = 0.25, -- Posición vertical ajustada un poco más abajo
 
     spawnPos = Vector3.new(-12640, 6, -4197),
     spawnRadius = 10,
