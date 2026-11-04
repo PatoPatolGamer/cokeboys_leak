@@ -578,7 +578,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (VENTANA DESLIZANTE DE 10S - PROMEDIO INSTANTÁNEO)
+-- TAB: FAST FARM (VENTANA DESLIZANTE CON SOPORTE COMPLETO DE REBIRTH)
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -593,7 +593,7 @@ tabs.fullFarm.timerStarted = false
 tabs.fullFarm.statHistory = {}
 tabs.fullFarm.windowSize = 10
 tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
-tabs.fullFarm.startSamples = {Strength = 0, Durability = 0}
+tabs.fullFarm.startSamples = {Strength = tabs.fullFarm.strength.Value, Durability = tabs.fullFarm.durability.Value}
 
 tabs.fullFarm.initialSendRate = 300
 tabs.fullFarm.maxSendRate = 480
@@ -639,11 +639,21 @@ end
 
 local function pushRollingSample(strVal, durVal)
     local now = os.clock()
-    table.insert(tabs.fullFarm.statHistory, { time = now, str = strVal, dur = durVal })
+    local history = tabs.fullFarm.statHistory
+    
+    -- Si detectamos una caída abrupta por Rebirth, limpiamos las muestras anteriores inmediatamente
+    if #history > 0 then
+        local last = history[#history]
+        if strVal < last.str or durVal < last.dur then
+            table.clear(history)
+        end
+    end
+    
+    table.insert(history, { time = now, str = strVal, dur = durVal })
     
     local cutoff = now - tabs.fullFarm.windowSize
-    while #tabs.fullFarm.statHistory > 0 and tabs.fullFarm.statHistory[1].time < cutoff do
-        table.remove(tabs.fullFarm.statHistory, 1)
+    while #history > 0 and history[1].time < cutoff do
+        table.remove(history, 1)
     end
 end
 
@@ -685,8 +695,8 @@ tabs.fullFarm.updateRuntime = function()
 end
 
 tabs.fullFarm.updateStats = function()
-    local gainedStr = math.max(0, tabs.fullFarm.strength.Value - tabs.fullFarm.startSamples.Strength)
-    local gainedDur = math.max(0, tabs.fullFarm.durability.Value - tabs.fullFarm.startSamples.Durability)
+    local gainedStr = tabs.fullFarm.statGains.Strength + math.max(0, tabs.fullFarm.strength.Value - tabs.fullFarm.startSamples.Strength)
+    local gainedDur = tabs.fullFarm.statGains.Durability + math.max(0, tabs.fullFarm.durability.Value - tabs.fullFarm.startSamples.Durability)
     
     tabs.fullFarm.StrengthStats.Text = "Strength: " .. formatCurrentStat(tabs.fullFarm.strength.Value)
         .. " | Gained: " .. (tabs.fullFarm.running and not tabs.fullFarm.timerStarted and "Preparing" or formatNumberSilence(gainedStr))
@@ -809,16 +819,38 @@ tabs.fullFarm.startWorker = function()
     task.spawn(tabs.fullFarm.workerLoop)
 end
 
+-- Detección de cambios con manejo inteligente de Rebirth
+local lastStrVal = tabs.fullFarm.strength.Value
+local lastDurVal = tabs.fullFarm.durability.Value
+
 utils.connect(tabs.fullFarm.strength:GetPropertyChangedSignal("Value"), function()
+    local currentStr = tabs.fullFarm.strength.Value
+    if currentStr < lastStrVal then
+        -- Caída detectada: se produjo Rebirth
+        tabs.fullFarm.statGains.Strength = tabs.fullFarm.statGains.Strength + math.max(0, lastStrVal - tabs.fullFarm.startSamples.Strength)
+        tabs.fullFarm.startSamples.Strength = currentStr
+        table.clear(tabs.fullFarm.statHistory)
+    end
+    lastStrVal = currentStr
+
     if tabs.fullFarm.running then
-        pushRollingSample(tabs.fullFarm.strength.Value, tabs.fullFarm.durability.Value)
+        pushRollingSample(currentStr, tabs.fullFarm.durability.Value)
     end
     tabs.fullFarm.updateStats()
 end)
 
 utils.connect(tabs.fullFarm.durability:GetPropertyChangedSignal("Value"), function()
+    local currentDur = tabs.fullFarm.durability.Value
+    if currentDur < lastDurVal then
+        -- Caída detectada: se produjo Rebirth
+        tabs.fullFarm.statGains.Durability = tabs.fullFarm.statGains.Durability + math.max(0, lastDurVal - tabs.fullFarm.startSamples.Durability)
+        tabs.fullFarm.startSamples.Durability = currentDur
+        table.clear(tabs.fullFarm.statHistory)
+    end
+    lastDurVal = currentDur
+
     if tabs.fullFarm.running then
-        pushRollingSample(tabs.fullFarm.strength.Value, tabs.fullFarm.durability.Value)
+        pushRollingSample(tabs.fullFarm.strength.Value, currentDur)
     end
     tabs.fullFarm.updateStats()
 end)
@@ -841,8 +873,10 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", fun
         tabs.fullFarm.timerStarted = false
         table.clear(tabs.fullFarm.statHistory)
         
-        tabs.fullFarm.startSamples.Strength = tabs.fullFarm.strength.Value
-        tabs.fullFarm.startSamples.Durability = tabs.fullFarm.durability.Value
+        lastStrVal = tabs.fullFarm.strength.Value
+        lastDurVal = tabs.fullFarm.durability.Value
+        tabs.fullFarm.startSamples.Strength = lastStrVal
+        tabs.fullFarm.startSamples.Durability = lastDurVal
         
         tabs.fullFarm.running = true
         tabs.fullFarm.Tokens = 0
