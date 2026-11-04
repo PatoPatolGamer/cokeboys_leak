@@ -578,7 +578,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (ADAPTATIVE + SEMANAL)
+-- TAB: FAST FARM (VENTANA DESLIZANTE DE 10S - PROMEDIO INSTANTÁNEO)
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -586,14 +586,14 @@ tabs.fullFarm.leaderstats = lp.player:WaitForChild("leaderstats")
 tabs.fullFarm.strength = tabs.fullFarm.leaderstats:WaitForChild("Strength")
 tabs.fullFarm.durability = lp.player:WaitForChild("Durability")
 tabs.fullFarm.running = false
-tabs.fullFarm.workerActive = false
 tabs.fullFarm.startedAt = 0
 tabs.fullFarm.totalElapsed = 0
 tabs.fullFarm.timerStarted = false
-tabs.fullFarm.gainedBaselineSet = false
 
-tabs.fullFarm.statSamples = {Strength = tabs.fullFarm.strength.Value, Durability = tabs.fullFarm.durability.Value}
+tabs.fullFarm.statHistory = {}
+tabs.fullFarm.windowSize = 10
 tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
+tabs.fullFarm.startSamples = {Strength = 0, Durability = 0}
 
 tabs.fullFarm.initialSendRate = 300
 tabs.fullFarm.maxSendRate = 480
@@ -637,12 +637,30 @@ local function setTimerRunning(tab, enabled)
     tab.timerStarted = enabled
 end
 
-local function recordStatGain(tab, key, value)
-    local previous = tab.statSamples[key]
-    tab.statSamples[key] = value
-    if tab.running and tab.timerStarted and previous then
-        tab.statGains[key] = tab.statGains[key] + math.max(0, value - previous)
+local function pushRollingSample(strVal, durVal)
+    local now = os.clock()
+    table.insert(tabs.fullFarm.statHistory, { time = now, str = strVal, dur = durVal })
+    
+    local cutoff = now - tabs.fullFarm.windowSize
+    while #tabs.fullFarm.statHistory > 0 and tabs.fullFarm.statHistory[1].time < cutoff do
+        table.remove(tabs.fullFarm.statHistory, 1)
     end
+end
+
+local function getRollingPace()
+    local history = tabs.fullFarm.statHistory
+    if #history < 2 then return 0, 0 end
+    
+    local oldest = history[1]
+    local newest = history[#history]
+    local dt = newest.time - oldest.time
+    
+    if dt <= 0.05 then return 0, 0 end
+    
+    local strPace = math.max(0, newest.str - oldest.str) / dt
+    local durPace = math.max(0, newest.dur - oldest.dur) / dt
+    
+    return strPace, durPace
 end
 
 local function sendTrainingReps(state, rate, maxBurst, canSend)
@@ -667,25 +685,29 @@ tabs.fullFarm.updateRuntime = function()
 end
 
 tabs.fullFarm.updateStats = function()
+    local gainedStr = math.max(0, tabs.fullFarm.strength.Value - tabs.fullFarm.startSamples.Strength)
+    local gainedDur = math.max(0, tabs.fullFarm.durability.Value - tabs.fullFarm.startSamples.Durability)
+    
     tabs.fullFarm.StrengthStats.Text = "Strength: " .. formatCurrentStat(tabs.fullFarm.strength.Value)
-        .. " | Gained: " .. (tabs.fullFarm.running and not tabs.fullFarm.timerStarted and "Preparing" or formatNumberSilence(tabs.fullFarm.statGains.Strength))
+        .. " | Gained: " .. (tabs.fullFarm.running and not tabs.fullFarm.timerStarted and "Preparing" or formatNumberSilence(gainedStr))
     tabs.fullFarm.DurabilityStats.Text = "Durability: " .. formatCurrentStat(tabs.fullFarm.durability.Value)
-        .. " | Gained: " .. (tabs.fullFarm.running and not tabs.fullFarm.timerStarted and "Preparing" or formatNumberSilence(tabs.fullFarm.statGains.Durability))
+        .. " | Gained: " .. (tabs.fullFarm.running and not tabs.fullFarm.timerStarted and "Preparing" or formatNumberSilence(gainedDur))
 end
 
 tabs.fullFarm.updateAverage = function()
-    local elapsed = getElapsed(tabs.fullFarm)
-    if elapsed <= 0 then return end
-    tabs.fullFarm.StrengthAverage.Text = "Str Ø: " .. formatPaceSilence(tabs.fullFarm.statGains.Strength / elapsed)
-    tabs.fullFarm.DurabilityAverage.Text = "Dura Ø: " .. formatPaceSilence(tabs.fullFarm.statGains.Durability / elapsed)
+    if not tabs.fullFarm.running or not tabs.fullFarm.timerStarted then return end
+    
+    local strRate, durRate = getRollingPace()
+    tabs.fullFarm.StrengthAverage.Text = "Str Ø: " .. formatPaceSilence(strRate)
+    tabs.fullFarm.DurabilityAverage.Text = "Dura Ø: " .. formatPaceSilence(durRate)
 end
 
 tabs.fullFarm.startMeasurement = function()
     if not tabs.fullFarm.running or tabs.fullFarm.timerStarted then return end
-    tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
-    tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
+    tabs.fullFarm.startSamples.Strength = tabs.fullFarm.strength.Value
+    tabs.fullFarm.startSamples.Durability = tabs.fullFarm.durability.Value
+    table.clear(tabs.fullFarm.statHistory)
     setTimerRunning(tabs.fullFarm, true)
-    tabs.fullFarm.nextAverageElapsed = getElapsed(tabs.fullFarm) + 10
     tabs.fullFarm.updateStats()
 end
 
@@ -788,12 +810,16 @@ tabs.fullFarm.startWorker = function()
 end
 
 utils.connect(tabs.fullFarm.strength:GetPropertyChangedSignal("Value"), function()
-    recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
+    if tabs.fullFarm.running then
+        pushRollingSample(tabs.fullFarm.strength.Value, tabs.fullFarm.durability.Value)
+    end
     tabs.fullFarm.updateStats()
 end)
 
 utils.connect(tabs.fullFarm.durability:GetPropertyChangedSignal("Value"), function()
-    recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
+    if tabs.fullFarm.running then
+        pushRollingSample(tabs.fullFarm.strength.Value, tabs.fullFarm.durability.Value)
+    end
     tabs.fullFarm.updateStats()
 end)
 
@@ -802,12 +828,6 @@ tabs.fullFarm:AddTextBox("Max reps/s (Def: 480): ", function(inputText)
     local value = tonumber(inputText)
     if not value or value == math.huge or value == -math.huge then return end
     value = math.max(1, value)
-    if value ~= tabs.fullFarm.maxSendRate and tabs.fullFarm.running then
-        recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
-        recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
-        setTimerRunning(tabs.fullFarm, false)
-        tabs.fullFarm.updateStats()
-    end
     tabs.fullFarm.maxSendRate = value
     tabs.fullFarm.sendRate = math.min(tabs.fullFarm.sendRate, tabs.fullFarm.maxSendRate)
 end, {clear = false})
@@ -819,9 +839,10 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", fun
         tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
         tabs.fullFarm.totalElapsed = 0
         tabs.fullFarm.timerStarted = false
+        table.clear(tabs.fullFarm.statHistory)
         
-        tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
-        tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
+        tabs.fullFarm.startSamples.Strength = tabs.fullFarm.strength.Value
+        tabs.fullFarm.startSamples.Durability = tabs.fullFarm.durability.Value
         
         tabs.fullFarm.running = true
         tabs.fullFarm.Tokens = 0
@@ -843,10 +864,9 @@ tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", fun
         tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         tabs.fullFarm.startWorker()
     else
-        recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
-        recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
         setTimerRunning(tabs.fullFarm, false)
         tabs.fullFarm.running = false
+        table.clear(tabs.fullFarm.statHistory)
         
         tabs.fullFarm.Status.Text = tabs.fullFarm.gainedBaselineSet and "Status: Paused" or "Status: Inactive"
         tabs.fullFarm.Status.TextColor3 = tabs.fullFarm.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
@@ -869,12 +889,12 @@ end)
 
 task.spawn(function()
     while utils.isCurrent() do
-        tabs.fullFarm.updateRuntime()
-        if tabs.fullFarm.timerStarted and getElapsed(tabs.fullFarm) >= (tabs.fullFarm.nextAverageElapsed or 10) then
+        if tabs.fullFarm.running and tabs.fullFarm.timerStarted then
+            pushRollingSample(tabs.fullFarm.strength.Value, tabs.fullFarm.durability.Value)
             tabs.fullFarm.updateAverage()
-            tabs.fullFarm.nextAverageElapsed = getElapsed(tabs.fullFarm) + 10
         end
-        task.wait(0.1)
+        tabs.fullFarm.updateRuntime()
+        task.wait(0.2)
     end
 end)
 
@@ -1618,17 +1638,14 @@ tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", 
             end)
 
             if killed then
-                -- 1. Desactivar el switch del Boss de Halloween inmediatamente
                 if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
                     tabs.boss.HalloweenBossToggle:Set(false)
                 else
                     tabs.boss.HalloweenData.Running = false
                 end
                 
-                -- 2. Esperar 5 segundos manteniendo la función desactivada
                 task.wait(5)
 
-                -- 3. Teletransportarse a la tienda de Halloween y girar la ruleta
                 pcall(function()
                     local char = lp.player.Character
                     local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1642,7 +1659,6 @@ tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", 
                     Event:InvokeServer("spin")
                 end)
 
-                -- 4. Esperar un momento adicional y volver a activar la opción automáticamente
                 task.wait(2)
                 if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
                     tabs.boss.HalloweenBossToggle:Set(true)
