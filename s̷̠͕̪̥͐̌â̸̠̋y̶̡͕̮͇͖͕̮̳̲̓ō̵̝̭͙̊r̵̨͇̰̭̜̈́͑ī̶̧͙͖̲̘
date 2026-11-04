@@ -329,7 +329,7 @@ function formatRateSilence(ratePerSecond)
         .. formatNumberSilence(ratePerSecond * 60) .. "/min | "
         .. formatNumberSilence(ratePerSecond * 3600) .. "/h | "
         .. formatNumberSilence(ratePerSecond * 86400) .. "/d | "
-        .. formatNumberSilence(ratePerSecond * 604800) .. "/sem"
+        .. formatNumberSilence(ratePerSecond * 604800) .. "/w"
 end
 
 local function createPrivacyRedactor(player, key)
@@ -578,7 +578,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (CON CALCULADORA DE SILENCE A 5 SECS Y /SEM)
+-- TAB: FAST FARM (CON CALCULADORA DE SILENCE A 5 SECS Y ESTIMACIÓN /W)
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -623,8 +623,8 @@ tabs.fullFarm.Status = tabs.fullFarm:AddLabel("Status: Inactive")
 tabs.fullFarm.Runtime = tabs.fullFarm:AddLabel("Runtime: 0d 0h 0m 0s")
 tabs.fullFarm.StrengthStats = tabs.fullFarm:AddLabel("Strength: " .. formatCurrentStat(tabs.fullFarm.strength.Value) .. " | Gained: 0")
 tabs.fullFarm.DurabilityStats = tabs.fullFarm:AddLabel("Durability: " .. formatCurrentStat(tabs.fullFarm.durability.Value) .. " | Gained: 0")
-tabs.fullFarm.StrengthAverage = tabs.fullFarm:AddLabel("Str Ø: --/s | --/min | --/h | --/d | --/sem")
-tabs.fullFarm.DurabilityAverage = tabs.fullFarm:AddLabel("Dura Ø: --/s | --/min | --/h | --/d | --/sem")
+tabs.fullFarm.StrengthAverage = tabs.fullFarm:AddLabel("Str Ø: --/s | --/min | --/h | --/d | --/w")
+tabs.fullFarm.DurabilityAverage = tabs.fullFarm:AddLabel("Dura Ø: --/s | --/min | --/h | --/d | --/w")
 tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 
 local function getElapsed(tab)
@@ -655,8 +655,8 @@ local function resetCalculations(tab)
     end
     tab.statSamples.Strength = tab.strength.Value
     tab.statSamples.Durability = tab.durability.Value
-    tab.StrengthAverage.Text = "Str Ø: --/s | --/min | --/h | --/d | --/sem"
-    tab.DurabilityAverage.Text = "Dura Ø: --/s | --/min | --/h | --/d | --/sem"
+    tab.StrengthAverage.Text = "Str Ø: --/s | --/min | --/h | --/d | --/w"
+    tab.DurabilityAverage.Text = "Dura Ø: --/s | --/min | --/h | --/d | --/w"
     tab.updateStats()
     tab.updateRuntime()
 end
@@ -887,7 +887,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: AUTO REBIRTH & CALCULATOR
+-- TAB: AUTO REBIRTH & CALCULATOR (INCLUYE PROYECCIÓN /W)
 -- ==========================================
 tabs.fullRebirth.FastRebirthV2Data = {
     Running = false,
@@ -922,9 +922,11 @@ local trackerSwitchRef = tabs.fullRebirth:AddSwitch("Enable Calculator", functio
         tabs.fullRebirth.Tracker.StartTime = tick()
         
         tabs.fullRebirth.AvgTimeLabel.Text = "Pace: Calculating..."
+        tabs.fullRebirth.RateLabel.Text = "Rate: --/h | --/d | --/w"
         tabs.fullRebirth.EtaLabel.Text = "ETA: Calculating..."
     else
         tabs.fullRebirth.AvgTimeLabel.Text = "Pace: Inactive"
+        tabs.fullRebirth.RateLabel.Text = "Rate: --/h | --/d | --/w"
         tabs.fullRebirth.EtaLabel.Text = "ETA: 0d 0h 0m 0s"
     end
 end)
@@ -940,6 +942,7 @@ tabs.fullRebirth.FastRebirthV2Status.TextColor3 = Color3.fromRGB(255, 80, 80)
 tabs.fullRebirth.FastRebirthV2Stats = tabs.fullRebirth:AddLabel("Rebirths: 0 | Gained: 0")
 tabs.fullRebirth.MissingLabel = tabs.fullRebirth:AddLabel("Missing: 0")
 tabs.fullRebirth.AvgTimeLabel = tabs.fullRebirth:AddLabel("Pace: Inactive")
+tabs.fullRebirth.RateLabel = tabs.fullRebirth:AddLabel("Rate: --/h | --/d | --/w")
 tabs.fullRebirth.EtaLabel = tabs.fullRebirth:AddLabel("ETA: 0d 0h 0m 0s")
 tabs.fullRebirth.EtaLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
 
@@ -957,8 +960,14 @@ task.spawn(function()
                 local now = tick()
                 local secElapsed = now - tabs.fullRebirth.Tracker.StartTime
                 local avgSecPerRb = secElapsed / totalGained
+                local rbPerSec = totalGained / secElapsed
                 
                 tabs.fullRebirth.AvgTimeLabel.Text = string.format("Pace: %.2f s/rebirth", avgSecPerRb)
+                tabs.fullRebirth.RateLabel.Text = string.format("Rate: %s/h | %s/d | %s/w",
+                    formatNumberSilence(rbPerSec * 3600),
+                    formatNumberSilence(rbPerSec * 86400),
+                    formatNumberSilence(rbPerSec * 604800)
+                )
                 
                 if tabs.fullRebirth.Tracker.TargetRebirths > 0 then
                     local missing = math.max(0, tabs.fullRebirth.Tracker.TargetRebirths - currentRebirths)
