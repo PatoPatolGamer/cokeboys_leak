@@ -453,7 +453,6 @@ local tabs = {
     boss = utils.ProyectadosHub:AddTab("Bosses"),
     clips = utils.ProyectadosHub:AddTab("PvP"),
     misiones = utils.ProyectadosHub:AddTab("Quests & Extras"),
-    race = utils.ProyectadosHub:AddTab("Race"),
     other = utils.ProyectadosHub:AddTab("Utilities"),
     info = utils.ProyectadosHub:AddTab("Info")
 }
@@ -578,7 +577,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM (CON CALCULADORA DE SILENCE A 5 SECS Y ESTIMACIÓN /W)
+-- TAB: FAST FARM 
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -887,7 +886,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: AUTO REBIRTH & CALCULATOR (INCLUYE PROYECCIÓN /W)
+-- TAB: AUTO REBIRTH & CALCULATOR 
 -- ==========================================
 tabs.fullRebirth.FastRebirthV2Data = {
     Running = false,
@@ -1170,21 +1169,21 @@ kingSwitchRef = tabs.configs:AddSwitch("Auto Farm Muscle King", function(state)
     end
 end):Set(false)
 
-tabs.configs:AddLabel("HALLOWEEN ZONE")
-tabs.configs.HalloweenLiftActive = false
-tabs.configs.HalloweenConnection = nil
-tabs.configs.SquatLoopActive = false
-tabs.configs.SquatConnection = nil
+tabs.configs:AddLabel("SNOW ZONE")
+tabs.configs.SnowLiftActive = false
+tabs.configs.SnowConnection = nil
+tabs.configs.SnowSquatLoopActive = false
+tabs.configs.SnowSquatConnection = nil
 
-local function setupHalloweenRespawn(pos, isSquat)
-    local connKey = isSquat and "SquatConnection" or "HalloweenConnection"
+local function setupSnowRespawn(pos, isSquat)
+    local connKey = isSquat and "SnowSquatConnection" or "SnowConnection"
     if tabs.configs[connKey] then
         tabs.configs[connKey]:Disconnect()
         tabs.configs[connKey] = nil
     end
     
     tabs.configs[connKey] = lp.player.CharacterAdded:Connect(function(char)
-        local activeCheck = isSquat and tabs.configs.SquatLoopActive or tabs.configs.HalloweenLiftActive
+        local activeCheck = isSquat and tabs.configs.SnowSquatLoopActive or tabs.configs.SnowLiftActive
         if not activeCheck or not utils.isCurrent() then return end
         task.wait(1)
         pcall(function()
@@ -1218,13 +1217,13 @@ task.spawn(function()
     while utils.isCurrent() do
         task.wait(2)
         pcall(function()
-            if tabs.configs.HalloweenLiftActive then
-                local targetPos = Vector3.new(5738, 86, 6415)
+            if tabs.configs.SnowLiftActive then
+                local targetPos = Vector3.new(-5375, 48, 10322)
                 if isMachineOccupied(targetPos) then
-                    tabs.configs.HalloweenLiftActive = false
-                    if tabs.configs.HalloweenConnection then
-                        tabs.configs.HalloweenConnection:Disconnect()
-                        tabs.configs.HalloweenConnection = nil
+                    tabs.configs.SnowLiftActive = false
+                    if tabs.configs.SnowConnection then
+                        tabs.configs.SnowConnection:Disconnect()
+                        tabs.configs.SnowConnection = nil
                     end
                     pcall(function() utils.remotes.MachineInteract:InvokeServer("leaveMachine") end)
                     if tabs.fullFarm and tabs.fullFarm.FastRepToggle then tabs.fullFarm.FastRepToggle:Set(false) end
@@ -1241,13 +1240,13 @@ task.spawn(function()
                 end
             end
 
-            if tabs.configs.SquatLoopActive then
-                local targetPos = Vector3.new(4813, 85, 5840)
+            if tabs.configs.SnowSquatLoopActive then
+                local targetPos = Vector3.new(-5097, 48, 11094)
                 if isMachineOccupied(targetPos) then
-                    tabs.configs.SquatLoopActive = false
-                    if tabs.configs.SquatConnection then
-                        tabs.configs.SquatConnection:Disconnect()
-                        tabs.configs.SquatConnection = nil
+                    tabs.configs.SnowSquatLoopActive = false
+                    if tabs.configs.SnowSquatConnection then
+                        tabs.configs.SnowSquatConnection:Disconnect()
+                        tabs.configs.SnowSquatConnection = nil
                     end
                     pcall(function() utils.remotes.MachineInteract:InvokeServer("leaveMachine") end)
                     if tabs.fullFarm and tabs.fullFarm.FastRepToggle then tabs.fullFarm.FastRepToggle:Set(false) end
@@ -1267,32 +1266,32 @@ task.spawn(function()
     end
 end)
 
-tabs.configs:AddSwitch("Farm Halloween Lift", function(state)
-    tabs.configs.HalloweenLiftActive = state
-    local targetPos = Vector3.new(5738, 86, 6415)
+tabs.configs:AddSwitch("Farm Snow Lift", function(state)
+    tabs.configs.SnowLiftActive = state
+    local targetPos = Vector3.new(-5375, 48, 10322)
     if state then
         pcall(function() utils.tpE(targetPos) end)
-        setupHalloweenRespawn(targetPos, false)
+        setupSnowRespawn(targetPos, false)
     else
-        if tabs.configs.HalloweenConnection then
-            tabs.configs.HalloweenConnection:Disconnect()
-            tabs.configs.HalloweenConnection = nil
+        if tabs.configs.SnowConnection then
+            tabs.configs.SnowConnection:Disconnect()
+            tabs.configs.SnowConnection = nil
         end
         pcall(function() utils.remotes.MachineInteract:InvokeServer("leaveMachine") end)
     end
     if tabs.fullFarm and tabs.fullFarm.FastRepToggle then tabs.fullFarm.FastRepToggle:Set(state) end
 end):Set(false)
 
-tabs.configs:AddSwitch("Farm Halloween Squat", function(state)
-    tabs.configs.SquatLoopActive = state
-    local targetPos = Vector3.new(4813, 85, 5840)
+tabs.configs:AddSwitch("Farm Snow Squat", function(state)
+    tabs.configs.SnowSquatLoopActive = state
+    local targetPos = Vector3.new(-5097, 48, 11094)
     if state then
         pcall(function() utils.tpE(targetPos) end)
-        setupHalloweenRespawn(targetPos, true)
+        setupSnowRespawn(targetPos, true)
     else
-        if tabs.configs.SquatConnection then
-            tabs.configs.SquatConnection:Disconnect()
-            tabs.configs.SquatConnection = nil
+        if tabs.configs.SnowSquatConnection then
+            tabs.configs.SnowSquatConnection:Disconnect()
+            tabs.configs.SnowSquatConnection = nil
         end
         pcall(function() utils.remotes.MachineInteract:InvokeServer("leaveMachine") end)
     end
@@ -1530,144 +1529,156 @@ tabs.boss.NormalBossToggle = tabs.boss:AddSwitch("Auto Farm Normal Boss", functi
     end)
 end)
 
-tabs.boss:AddLabel("HALLOWEEN BOSSES")
-
-tabs.boss.findHalloweenBoss = function()
-    for _, bossName in ipairs(halloweenBossNames) do
-        if tabs.boss.HalloweenData.TargetBoss == "Todos" or tabs.boss.HalloweenData.TargetBoss == bossName then
-            local candidate = services.Workspace:FindFirstChild(bossName)
-            if candidate and candidate:IsA("Model") then
-                local health, maxHealth, hitbox = tabs.boss.getBossData(candidate)
-                if hitbox then return candidate, bossName, health, maxHealth, hitbox end
-            end
-        end
-    end
-    return nil
-end
-
-tabs.boss.HalloweenDropdown = tabs.boss:AddDropdown("Select Halloween Boss", function(selectedName)
-    if selectedName ~= "" then tabs.boss.HalloweenData.TargetBoss = selectedName end
-end)
-tabs.boss.HalloweenDropdown:Add("Todos")
+-- Cargamos los nombres internamente para evitar bugs en otras partes del script
 for _, name in ipairs(halloweenBossNames) do
     tabs.boss.HalloweenData.HalloweenBosses[name] = true
-    tabs.boss.HalloweenDropdown:Add(name)
 end
 
-tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
-    tabs.boss.HalloweenData.Running = state
-    tabs.boss.HalloweenData.Generation = tabs.boss.HalloweenData.Generation + 1
-    local gen = tabs.boss.HalloweenData.Generation
-    
-    pcall(function()
-        if utils.remotes.ChangeSpeedSize then
-            local targetSize = state and 5 or 2
-            utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", targetSize)
-        end
-    end)
+-- ==========================================
+-- HALLOWEEN BOSSES (OCULTOS TEMPORALMENTE)
+-- ==========================================
+local MOSTRAR_HALLOWEEN_BOSSES = false -- ¡Cambia esto a 'true' para reactivar el menú de los jefes de Halloween!
 
-    if not state then
-        tabs.boss.StatusLabel.Text = "Status: Inactive"
-        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-        tabs.boss.BossLabel.Text = "Boss: None"
-        tabs.boss.HealthLabel.Text = "Health: 0 / 0"
-        return
+if MOSTRAR_HALLOWEEN_BOSSES then
+    tabs.boss:AddLabel("HALLOWEEN BOSSES")
+
+    tabs.boss.findHalloweenBoss = function()
+        for _, bossName in ipairs(halloweenBossNames) do
+            if tabs.boss.HalloweenData.TargetBoss == "Todos" or tabs.boss.HalloweenData.TargetBoss == bossName then
+                local candidate = services.Workspace:FindFirstChild(bossName)
+                if candidate and candidate:IsA("Model") then
+                    local health, maxHealth, hitbox = tabs.boss.getBossData(candidate)
+                    if hitbox then return candidate, bossName, health, maxHealth, hitbox end
+                end
+            end
+        end
+        return nil
     end
 
-    task.spawn(function()
-        local bossExisted = false
-        while utils.isCurrent() and tabs.boss.HalloweenData.Running and tabs.boss.HalloweenData.Generation == gen do
-            local killed = false
-            pcall(function()
-                local model, bossName, health, maxHealth, hitbox = tabs.boss.findHalloweenBoss()
-                if model and hitbox then
-                    bossExisted = true
-                    
-                    if health and health <= 0 then
-                        killed = true
-                    else
-                        tabs.boss.StatusLabel.Text = "Status: Fighting Halloween Boss"
-                        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
-                        tabs.boss.BossLabel.Text = "Boss: " .. bossName
-                        if health and maxHealth then
-                            tabs.boss.HealthLabel.Text = "Health: " .. formatNumberSilence(health) .. " / " .. formatNumberSilence(maxHealth)
-                        else
-                            tabs.boss.HealthLabel.Text = "Health: Active"
-                        end
+    tabs.boss.HalloweenDropdown = tabs.boss:AddDropdown("Select Halloween Boss", function(selectedName)
+        if selectedName ~= "" then tabs.boss.HalloweenData.TargetBoss = selectedName end
+    end)
+    tabs.boss.HalloweenDropdown:Add("Todos")
+    for _, name in ipairs(halloweenBossNames) do
+        tabs.boss.HalloweenDropdown:Add(name)
+    end
 
-                        hitbox.Size = Vector3.new(60, 120, 60)
-                        hitbox.Transparency = 1
-                        hitbox.CanCollide = false
-                        local char = lp.player.Character
-                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                        local punch = char and char:FindFirstChild("Punch") or utils.playerData.Backpack:FindFirstChild("Punch")
-                        
-                        if hrp then
-                            if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
-                            local alturaDinamica = (hitbox.Size.Y / 2) + 15
-                            
-                            local velocidadOrbita = tick() * 3
-                            local radioEvasion = 12
-                            local offsetX = math.cos(velocidadOrbita) * radioEvasion
-                            local offsetZ = math.sin(velocidadOrbita) * radioEvasion
-                            local offsetSeguro = Vector3.new(offsetX, alturaDinamica, offsetZ)
-                            
-                            hrp.CFrame = CFrame.lookAt(hitbox.Position + offsetSeguro, hitbox.Position)
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            
-                            if utils.remotes.MuscleEvent then
-                                utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
-                                utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
-                            end
-                            if punch then punch:Activate() end
-                        end
-                    end
-                else
-                    if bossExisted then
-                        killed = true
-                    else
-                        tabs.boss.StatusLabel.Text = "Status: Waiting Halloween Boss"
-                        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
-                        tabs.boss.BossLabel.Text = "Boss: None"
-                        tabs.boss.HealthLabel.Text = "Health: 0 / 0"
-                    end
-                end
-            end)
+    tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
+        tabs.boss.HalloweenData.Running = state
+        tabs.boss.HalloweenData.Generation = tabs.boss.HalloweenData.Generation + 1
+        local gen = tabs.boss.HalloweenData.Generation
+        
+        pcall(function()
+            if utils.remotes.ChangeSpeedSize then
+                local targetSize = state and 5 or 2
+                utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", targetSize)
+            end
+        end)
 
-            if killed then
-                if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
-                    tabs.boss.HalloweenBossToggle:Set(false)
-                else
-                    tabs.boss.HalloweenData.Running = false
-                end
-                
-                task.wait(5)
+        if not state then
+            tabs.boss.StatusLabel.Text = "Status: Inactive"
+            tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            tabs.boss.BossLabel.Text = "Boss: None"
+            tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+            return
+        end
 
+        task.spawn(function()
+            local bossExisted = false
+            while utils.isCurrent() and tabs.boss.HalloweenData.Running and tabs.boss.HalloweenData.Generation == gen do
+                local killed = false
                 pcall(function()
-                    local char = lp.player.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        hrp.CFrame = CFrame.new(Vector3.new(5421, 86, 6261))
-                        hrp.AssemblyLinearVelocity = Vector3.zero
-                        task.wait(0.4)
+                    local model, bossName, health, maxHealth, hitbox = tabs.boss.findHalloweenBoss()
+                    if model and hitbox then
+                        bossExisted = true
+                        
+                        if health and health <= 0 then
+                            killed = true
+                        else
+                            tabs.boss.StatusLabel.Text = "Status: Fighting Halloween Boss"
+                            tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+                            tabs.boss.BossLabel.Text = "Boss: " .. bossName
+                            if health and maxHealth then
+                                tabs.boss.HealthLabel.Text = "Health: " .. formatNumberSilence(health) .. " / " .. formatNumberSilence(maxHealth)
+                            else
+                                tabs.boss.HealthLabel.Text = "Health: Active"
+                            end
+
+                            hitbox.Size = Vector3.new(60, 120, 60)
+                            hitbox.Transparency = 1
+                            hitbox.CanCollide = false
+                            local char = lp.player.Character
+                            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                            local punch = char and char:FindFirstChild("Punch") or utils.playerData.Backpack:FindFirstChild("Punch")
+                            
+                            if hrp then
+                                if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
+                                local alturaDinamica = (hitbox.Size.Y / 2) + 15
+                                
+                                local velocidadOrbita = tick() * 3
+                                local radioEvasion = 12
+                                local offsetX = math.cos(velocidadOrbita) * radioEvasion
+                                local offsetZ = math.sin(velocidadOrbita) * radioEvasion
+                                local offsetSeguro = Vector3.new(offsetX, alturaDinamica, offsetZ)
+                                
+                                hrp.CFrame = CFrame.lookAt(hitbox.Position + offsetSeguro, hitbox.Position)
+                                hrp.AssemblyLinearVelocity = Vector3.zero
+                                
+                                if utils.remotes.MuscleEvent then
+                                    utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
+                                    utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
+                                end
+                                if punch then punch:Activate() end
+                            end
+                        end
+                    else
+                        if bossExisted then
+                            killed = true
+                        else
+                            tabs.boss.StatusLabel.Text = "Status: Waiting Halloween Boss"
+                            tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
+                            tabs.boss.BossLabel.Text = "Boss: None"
+                            tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+                        end
                     end
-                    
-                    local Event = game:GetService("ReplicatedStorage").rEvents.halloweenWheelRemote
-                    Event:InvokeServer("spin")
                 end)
 
-                task.wait(2)
-                if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
-                    tabs.boss.HalloweenBossToggle:Set(true)
-                end
-                
-                break
-            end
+                if killed then
+                    if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
+                        tabs.boss.HalloweenBossToggle:Set(false)
+                    else
+                        tabs.boss.HalloweenData.Running = false
+                    end
+                    
+                    task.wait(5)
 
-            task.wait(tabs.boss.HalloweenData.HitInterval)
-        end
+                    pcall(function()
+                        local char = lp.player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        if hrp then
+                            hrp.CFrame = CFrame.new(Vector3.new(5421, 86, 6261))
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+                            task.wait(0.4)
+                        end
+                        
+                        local Event = game:GetService("ReplicatedStorage").rEvents.halloweenWheelRemote
+                        Event:InvokeServer("spin")
+                    end)
+
+                    task.wait(2)
+                    if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
+                        tabs.boss.HalloweenBossToggle:Set(true)
+                    end
+                    
+                    break
+                end
+
+                task.wait(tabs.boss.HalloweenData.HitInterval)
+            end
+        end)
     end)
-end)
+end
+-- ==========================================
 
 pcall(function()
     if utils.remotes.GuiDamageEvent then
@@ -1906,7 +1917,7 @@ task.spawn(function()
 end)
 
 tabs.misiones:AddLabel("CRYSTALS")
-tabs.misiones:AddSwitch("Auto Open Hallowed Crystal", function(state)
+tabs.misiones:AddSwitch("Auto Open Zero Degrees Crystal", function(state)
     _G.AutoAbrirCristales = state
     if state then
         task.spawn(function()
@@ -1914,7 +1925,7 @@ tabs.misiones:AddSwitch("Auto Open Hallowed Crystal", function(state)
             while _G.AutoAbrirCristales and utils.isCurrent() do
                 pcall(function()
                     if event then
-                        event:InvokeServer("openCrystalBulk", "Hallowed Crystal", 10)
+                        event:InvokeServer("openCrystalBulk", "Zero Degrees Crystal", 10)
                     end
                 end)
                 task.wait(4)
@@ -1935,613 +1946,6 @@ tabs.misiones:AddSwitch("Auto Spin Wheel", function(bool)
                 task.wait(1)
             end
         end)
-    end
-end)
-
--- ==========================================
--- TAB: RACE (Modos Normal y TP Integrados)
--- ==========================================
-tabs.race.CFG = {
-    activeNormal = false,
-    activeTp = false,
-    normalSpeed = 16,
-    liftSpeed = 45,
-    runSpeed = 60,
-    pauseTime = 5,
-    cps = 30,
-    
-    clickXRatio = 0.05,
-    clickYRatio = 0.25,
-
-    spawnPos = Vector3.new(-12640, 6, -4197),
-    spawnRadius = 10,
-    startLineXTrigger = -12880,
-    wallPos = Vector3.new(-13370, 10, -4144),
-    wallSize = Vector3.new(5, 20, 180),
-    wallX = -13370,
-    
-    tpLiftX = -13742,
-    tpWrestleX = -13840,
-    tpFinishX = -14001, 
-
-    jumpCoords = {
-        Vector3.new(-12943, 6, -4143),
-        Vector3.new(-12999, 6, -4143),
-        Vector3.new(-13064, 6, -4143),
-        Vector3.new(-13124, 6, -4143),
-        Vector3.new(-13184, 6, -4143),
-        Vector3.new(-13244, 6, -4143),
-        Vector3.new(-13305, 6, -4143)
-    },
-
-    laneCoords = {
-        [1]  = Vector3.new(-13331, 6, -4129),
-        [2]  = Vector3.new(-13330, 6, -4143),
-        [3]  = Vector3.new(-13332, 6, -4155),
-        [4]  = Vector3.new(-13332, 6, -4170),
-        [5]  = Vector3.new(-13332, 6, -4184),
-        [6]  = Vector3.new(-13332, 6, -4200),
-        [7]  = Vector3.new(-13332, 6, -4214),
-        [8]  = Vector3.new(-13334, 6, -4228),
-        [9]  = Vector3.new(-13335, 6, -4242),
-        [10] = Vector3.new(-13335, 6, -4256),
-    },
-    finishCoords = {
-        [1]  = Vector3.new(-14544, 6, -4128),
-        [2]  = Vector3.new(-14544, 6, -4143),
-        [3]  = Vector3.new(-14544, 6, -4155),
-        [4]  = Vector3.new(-14544, 6, -4170),
-        [5]  = Vector3.new(-14544, 6, -4184),
-        [6]  = Vector3.new(-14544, 6, -4200),
-        [7]  = Vector3.new(-14544, 6, -4214),
-        [8]  = Vector3.new(-14544, 6, -4228),
-        [9]  = Vector3.new(-14544, 6, -4242),
-        [10] = Vector3.new(-14544, 6, -4256),
-    }
-}
-
-local function getRaceChar()
-    local char = lp.player.Character
-    if not char then return nil, nil, nil end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hrp and hum and hum.Health > 0 then
-        return char, hrp, hum
-    end
-    return nil, nil, nil
-end
-
-local function tpRace(target)
-    if not tabs.race.CFG.activeNormal and not tabs.race.CFG.activeTp then return end
-    local _, hrp = getRaceChar()
-    if hrp then hrp.CFrame = target end
-end
-
-local function resetRaceSpeed()
-    if not tabs.race.CFG.activeNormal and not tabs.race.CFG.activeTp then return end
-    local _, _, hum = getRaceChar()
-    if hum then
-        hum.WalkSpeed = tabs.race.CFG.normalSpeed
-        hum.PlatformStand = false
-    end
-end
-
-local function getRacePart(inst)
-    if not inst then return nil end
-    if inst:IsA("BasePart") then return inst end
-    local hit = inst:FindFirstChild("Hitbox") or inst:FindFirstChild("TouchPart") or inst.PrimaryPart
-    if hit then return hit end
-    for _, obj in ipairs(inst:GetDescendants()) do
-        if obj:IsA("BasePart") then return obj end
-    end
-    return nil
-end
-
-local function moveRaceTo(pos, activeCheck)
-    if not activeCheck() then return end
-    local _, hrp, hum = getRaceChar()
-    if not hrp or not hum then return end
-    
-    for _, v in ipairs(hrp:GetChildren()) do
-        if v:IsA("BodyVelocity") or v:IsA("BodyGyro") or v:IsA("LinearVelocity") then 
-            v:Destroy() 
-        end
-    end
-    hum.PlatformStand = false
-    
-    while activeCheck() and utils.isCurrent() do
-        local _, curHrp, curHum = getRaceChar()
-        if not curHrp or not curHum then break end
-        
-        local curPos = curHrp.Position
-        local dist = (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(curPos.X, 0, curPos.Z)).Magnitude
-        if dist < 4 then break end 
-        
-        curHum:MoveTo(pos)
-        task.wait(0.1)
-    end
-    
-    local _, _, endHum = getRaceChar()
-    if endHum then endHum:Move(Vector3.zero) end
-end
-
-local function moveRaceToWithJumps(pos, jumpCoords, activeCheck)
-    if not activeCheck() then return end
-    local _, hrp, hum = getRaceChar()
-    if not hrp or not hum then return end
-    
-    for _, v in ipairs(hrp:GetChildren()) do
-        if v:IsA("BodyVelocity") or v:IsA("BodyGyro") or v:IsA("LinearVelocity") then 
-            v:Destroy() 
-        end
-    end
-    hum.PlatformStand = false
-
-    local triggeredJumps = {}
-    for i = 1, #jumpCoords do triggeredJumps[i] = false end
-    
-    while activeCheck() and utils.isCurrent() do
-        local _, curHrp, curHum = getRaceChar()
-        if not curHrp or not curHum then break end
-        
-        local curPos = curHrp.Position
-        local dist = (Vector3.new(pos.X, 0, pos.Z) - Vector3.new(curPos.X, 0, curPos.Z)).Magnitude
-        if dist < 4 then break end 
-        
-        local curX = curPos.X
-        for i, jumpPoint in ipairs(jumpCoords) do
-            if not triggeredJumps[i] then
-                if math.abs(curX - jumpPoint.X) <= 2 then
-                    triggeredJumps[i] = true
-                    task.spawn(function()
-                        pcall(function()
-                            services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
-                            task.wait(0.1)
-                            services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-                        end)
-                    end)
-                end
-            end
-        end
-
-        curHum:MoveTo(pos)
-        task.wait(0.02)
-    end
-    
-    local _, _, endHum = getRaceChar()
-    if endHum then endHum:Move(Vector3.zero) end
-end
-
-local function getRaceLaneByPosition(hrp)
-    if not hrp then return nil, 1 end
-    local charZ = hrp.Position.Z
-    local bestLaneNum = 1
-    local minZDist = math.huge
-    
-    for laneNum, coord in pairs(tabs.race.CFG.laneCoords) do
-        local dist = math.abs(charZ - coord.Z)
-        if dist < minZDist then
-            minZDist = dist
-            bestLaneNum = laneNum
-        end
-    end
-    
-    local gym = services.Workspace:FindFirstChild("StrongbloxianGym")
-    local course = gym and gym:FindFirstChild("Course")
-    local lanes = course and course:FindFirstChild("Lanes")
-    
-    if lanes then
-        for _, lane in ipairs(lanes:GetChildren()) do
-            local num = tonumber(string.match(lane.Name, "%d+"))
-            if num == bestLaneNum then
-                return lane, bestLaneNum
-            end
-        end
-        return lanes:GetChildren()[bestLaneNum] or lanes:GetChildren()[1], bestLaneNum
-    end
-    
-    return nil, bestLaneNum
-end
-
-tabs.race.wallObj = nil
-tabs.race.passCount = 0
-tabs.race.wallChecking = false
-
-local function createRaceWall()
-    if not tabs.race.CFG.activeTp then return end
-    if tabs.race.wallObj and tabs.race.wallObj.Parent then
-        tabs.race.wallObj.CanCollide = true
-        return
-    end
-    local wall = Instance.new("Part")
-    wall.Name = "ProyectadosInvisibleWall"
-    wall.Size = tabs.race.CFG.wallSize
-    wall.CFrame = CFrame.new(tabs.race.CFG.wallPos)
-    wall.Anchored = true
-    wall.CanCollide = true
-    wall.Transparency = 1
-    wall.Parent = services.Workspace
-    tabs.race.wallObj = wall
-    tabs.race.passCount = 0
-end
-
-local function clearRaceWall()
-    if tabs.race.wallObj then
-        tabs.race.wallObj.CanCollide = false
-        tabs.race.wallObj:Destroy()
-        tabs.race.wallObj = nil
-    end
-    tabs.race.passCount = 0
-    tabs.race.wallChecking = false
-end
-
-local function checkRaceWall()
-    if tabs.race.wallChecking then return end
-    tabs.race.wallChecking = true
-    task.spawn(function()
-        local inZone = false
-        while tabs.race.CFG.activeTp and tabs.race.wallObj and tabs.race.wallChecking and utils.isCurrent() do
-            local _, hrp = getRaceChar()
-            if hrp then
-                local curX = hrp.Position.X
-                local dist = math.abs(curX - tabs.race.CFG.wallX)
-                if dist <= 8 and not inZone then
-                    inZone = true
-                    tabs.race.passCount = tabs.race.passCount + 1
-                    if tabs.race.passCount >= 2 then
-                        clearRaceWall()
-                        break
-                    end
-                elseif dist > 14 and inZone then
-                    inZone = false
-                end
-            end
-            task.wait(0.1)
-        end
-        tabs.race.wallChecking = false
-    end)
-end
-
-local function doRaceClick()
-    if not tabs.race.CFG.activeNormal and not tabs.race.CFG.activeTp then return end
-    local cam = services.Workspace.CurrentCamera
-    if not cam then return end
-    local vp = cam.ViewportSize
-    local cx = math.floor(vp.X * tabs.race.CFG.clickXRatio)
-    local cy = math.floor(vp.Y * tabs.race.CFG.clickYRatio)
-
-    pcall(function()
-        services.VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-        services.VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
-    end)
-end
-
-tabs.race:AddLabel("SISTEMA DE CARRERA AUTOMATIZADA")
-tabs.race.LaneLabel = tabs.race:AddLabel("Carril Detectado: Ninguno")
-
-task.spawn(function()
-    local lastLaneName = ""
-    while utils.isCurrent() do
-        if tabs.race.CFG.activeNormal or tabs.race.CFG.activeTp then
-            local _, hrp = getRaceChar()
-            if hrp then
-                local _, laneNum = getRaceLaneByPosition(hrp)
-                local currentLaneName = "Lane " .. laneNum
-                if currentLaneName ~= lastLaneName then
-                    lastLaneName = currentLaneName
-                    tabs.race.LaneLabel.Text = "Carril Detectado: " .. currentLaneName
-                end
-            end
-        end
-        task.wait(0.2)
-    end
-end)
-
--- --- MODO NORMAL (SALTOS) ---
-tabs.race:AddLabel("--- MODO NORMAL (SALTOS) ---")
-tabs.race.StatusNormal = tabs.race:AddLabel("Estado: Inactivo")
-
-local switchNormal = nil
-switchNormal = tabs.race:AddSwitch("Auto Race Normal", function(state)
-    tabs.race.CFG.activeNormal = state
-    if state then
-        task.spawn(function()
-            while tabs.race.CFG.activeNormal and utils.isCurrent() do
-                local _, hrp, hum = getRaceChar()
-                local gym = services.Workspace:FindFirstChild("StrongbloxianGym")
-                
-                if hrp and hum and gym then
-                    if gym:FindFirstChild("LaneDividers") then
-                        for _, div in ipairs(gym.LaneDividers:GetDescendants()) do
-                            if div:IsA("BasePart") then div.CanCollide = false end
-                        end
-                    end
-                    
-                    tabs.race.StatusNormal.Text = "Estado: Yendo a QueueZone..."
-                    local queueZone = gym:FindFirstChild("Lobby") 
-                                  and gym.Lobby:FindFirstChild("Markers") 
-                                  and gym.Lobby.Markers:FindFirstChild("QueueZone")
-                    if queueZone then
-                        tpRace(queueZone.CFrame + Vector3.new(0, 3, 0))
-                    end
-                    
-                    tabs.race.StatusNormal.Text = "Estado: Esperando inicio de carrera en la línea de salida..."
-                    local curLane, laneNum = nil, 1
-                    while tabs.race.CFG.activeNormal and utils.isCurrent() do
-                        local _, currentHrp = getRaceChar()
-                        if currentHrp and currentHrp.Position.X <= tabs.race.CFG.startLineXTrigger then
-                            curLane, laneNum = getRaceLaneByPosition(currentHrp)
-                            break
-                        end
-                        task.wait(0.1)
-                    end
-                    if not tabs.race.CFG.activeNormal then break end
-                    
-                    local course = gym:FindFirstChild("Course")
-                    
-                    tabs.race.StatusNormal.Text = "Estado: Saltando vallas (Carril " .. laneNum .. ")..."
-                    hum.PlatformStand = false
-                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
-                    
-                    moveRaceToWithJumps(tabs.race.CFG.laneCoords[laneNum], tabs.race.CFG.jumpCoords, function() return tabs.race.CFG.activeNormal end)
-                    if not tabs.race.CFG.activeNormal then break end
-                    
-                    tabs.race.StatusNormal.Text = "Estado: Arrastrando Trineo..."
-                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
-                    local liftSeg = curLane and getRacePart(curLane.Segments:FindFirstChild("03_HeavyLift"))
-                    if liftSeg then moveRaceTo(liftSeg.Position, function() return tabs.race.CFG.activeNormal end) end
-                    if not tabs.race.CFG.activeNormal then break end
-                    
-                    local clicking = true
-                    task.spawn(function()
-                        local delayTime = 1 / tabs.race.CFG.cps
-                        while tabs.race.CFG.activeNormal and clicking and utils.isCurrent() do
-                            doRaceClick()
-                            task.wait(delayTime)
-                        end
-                    end)
-                    
-                    tabs.race.StatusNormal.Text = "Estado: Levantando Pesa..."
-                    hum.WalkSpeed = tabs.race.CFG.liftSpeed
-                    if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
-                    task.wait(0.2)
-                    
-                    local wrestleSeg = curLane and getRacePart(curLane.Segments:FindFirstChild("04_ArmWrestle"))
-                    if wrestleSeg then moveRaceTo(wrestleSeg.Position, function() return tabs.race.CFG.activeNormal end) end
-                    
-                    if tabs.race.CFG.activeNormal and wrestleSeg then
-                        tabs.race.StatusNormal.Text = "Estado: Compitiendo en Pulso..."
-                        tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
-                        task.wait(0.2)
-                    end
-                    
-                    if tabs.race.CFG.activeNormal then
-                        tabs.race.StatusNormal.Text = "Estado: ¡Sprint a Meta!"
-                        hum.WalkSpeed = tabs.race.CFG.runSpeed
-                        local finishGate = course and course:FindFirstChild("FinishGate")
-                        local fallbackFinish = getRacePart(finishGate) and getRacePart(finishGate).Position
-                        local finishPos = tabs.race.CFG.finishCoords[laneNum] or fallbackFinish
-                        if finishPos then moveRaceTo(finishPos, function() return tabs.race.CFG.activeNormal end) end
-                    end
-                    
-                    clicking = false
-                    tabs.race.StatusNormal.Text = "Estado: ¡Carrera Completada!"
-                    resetRaceSpeed()
-                    task.wait(2)
-                end
-                task.wait(2)
-            end
-            resetRaceSpeed()
-            tabs.race.StatusNormal.Text = "Estado: Inactivo"
-        end)
-    else
-        resetRaceSpeed()
-        tabs.race.StatusNormal.Text = "Estado: Inactivo"
-    end
-end)
-switchNormal:Set(false)
-
--- --- MODO RÁPIDO (TELETRANSPORTES) ---
-tabs.race:AddLabel("--- MODO RÁPIDO (TELETRANSPORTES) ---")
-tabs.race.StatusTp = tabs.race:AddLabel("Estado: Inactivo")
-
-local switchTp = nil
-switchTp = tabs.race:AddSwitch("Auto Race TP", function(state)
-    tabs.race.CFG.activeTp = state
-    if state then
-        task.spawn(function()
-            while tabs.race.CFG.activeTp and utils.isCurrent() do
-                local _, hrp, hum = getRaceChar()
-                local gym = services.Workspace:FindFirstChild("StrongbloxianGym")
-                
-                if hrp and hum and gym then
-                    if gym:FindFirstChild("LaneDividers") then
-                        for _, div in ipairs(gym.LaneDividers:GetDescendants()) do
-                            if div:IsA("BasePart") then div.CanCollide = false end
-                        end
-                    end
-                    
-                    tabs.race.StatusTp.Text = "Estado: Yendo a QueueZone..."
-                    local queueZone = gym:FindFirstChild("Lobby") 
-                                  and gym.Lobby:FindFirstChild("Markers") 
-                                  and gym.Lobby.Markers:FindFirstChild("QueueZone")
-                    if queueZone then
-                        tpRace(queueZone.CFrame + Vector3.new(0, 3, 0))
-                    end
-                    
-                    tabs.race.StatusTp.Text = "Estado: Esperando inicio de carrera en la línea de salida..."
-                    local curLane, laneNum = nil, 1
-                    while tabs.race.CFG.activeTp and utils.isCurrent() do
-                        local _, currentHrp = getRaceChar()
-                        if currentHrp and currentHrp.Position.X <= tabs.race.CFG.startLineXTrigger then
-                            curLane, laneNum = getRaceLaneByPosition(currentHrp)
-                            break
-                        end
-                        task.wait(0.1)
-                    end
-                    if not tabs.race.CFG.activeTp then break end
-                    
-                    local course = gym:FindFirstChild("Course")
-                    local finishGate = course and course:FindFirstChild("FinishGate")
-                    local segs = curLane and curLane:FindFirstChild("Segments")
-                    
-                    local sledSeg = segs and getRacePart(segs:FindFirstChild("02_HeavySled"))
-                    local liftSeg = segs and getRacePart(segs:FindFirstChild("03_HeavyLift"))
-                    local wrestleSeg = segs and getRacePart(segs:FindFirstChild("04_ArmWrestle"))
-                    local fallbackFinish = getRacePart(finishGate)
-                    
-                    local targetPos = tabs.race.CFG.laneCoords[laneNum]
-                    local finishPos = tabs.race.CFG.finishCoords[laneNum] or (fallbackFinish and fallbackFinish.Position)
-                    
-                    if laneNum == 6 then
-                        clearRaceWall()
-                    else
-                        createRaceWall()
-                        checkRaceWall()
-                    end
-                    
-                    tabs.race.StatusTp.Text = "Estado: TP Sección 1 (Carril " .. laneNum .. ")..."
-                    hum.PlatformStand = true
-                    if targetPos then tpRace(CFrame.new(targetPos)) elseif sledSeg then tpRace(sledSeg.CFrame + Vector3.new(0, 3, 0)) end
-                    task.wait(0.2)
-                    hum.PlatformStand = false
-                    
-                    local pauseSec = 5
-                    while pauseSec > 0 and utils.isCurrent() do
-                        if not tabs.race.CFG.activeTp then break end
-                        tabs.race.StatusTp.Text = "Estado: Pausa (" .. pauseSec .. "s)..."
-                        task.wait(1)
-                        pauseSec = pauseSec - 1
-                    end
-                    if not tabs.race.CFG.activeTp then break end
-                    
-                    tabs.race.StatusTp.Text = "Estado: Arrastrando Trineo..."
-                    hum.WalkSpeed = tabs.race.CFG.normalSpeed
-                    task.wait(0.5)
-                    
-                    local tpLiftTriggered = false
-                    task.spawn(function()
-                        while tabs.race.CFG.activeTp and not tpLiftTriggered and utils.isCurrent() do
-                            local _, currentHrp = getRaceChar()
-                            if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpLiftX then
-                                tpLiftTriggered = true
-                                tabs.race.StatusTp.Text = "Estado: TP a Levantamiento..."
-                                if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
-                                break
-                            end
-                            task.wait(0.05)
-                        end
-                    end)
-                    if liftSeg then moveRaceTo(liftSeg.Position, function() return tabs.race.CFG.activeTp end) end
-                    tpLiftTriggered = true
-                    
-                    if not tabs.race.CFG.activeTp then break end
-                    
-                    local clicking = true
-                    task.spawn(function()
-                        while tabs.race.CFG.activeTp and clicking and utils.isCurrent() do
-                            for _ = 1, 3 do doRaceClick() end
-                            task.wait()
-                        end
-                    end)
-                    
-                    tabs.race.StatusTp.Text = "Estado: Levantando Pesa (Autoclick)..."
-                    hum.WalkSpeed = tabs.race.CFG.liftSpeed
-                    if liftSeg then tpRace(liftSeg.CFrame + Vector3.new(0, 3, 0)) end
-                    task.wait(0.2)
-                    
-                    local tpWrestleTriggered = false
-                    task.spawn(function()
-                        while tabs.race.CFG.activeTp and not tpWrestleTriggered and utils.isCurrent() do
-                            local _, currentHrp = getRaceChar()
-                            if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpWrestleX then
-                                tpWrestleTriggered = true
-                                tabs.race.StatusTp.Text = "Estado: TP a Pulso..."
-                                if wrestleSeg then tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0)) end
-                                break
-                            end
-                            task.wait(0.05)
-                        end
-                    end)
-                    if wrestleSeg then moveRaceTo(wrestleSeg.Position, function() return tabs.race.CFG.activeTp end) end
-                    tpWrestleTriggered = true
-                    
-                    if tabs.race.CFG.activeTp and wrestleSeg then
-                        tabs.race.StatusTp.Text = "Estado: Compitiendo en Pulso..."
-                        tpRace(wrestleSeg.CFrame + Vector3.new(0, 3, 0))
-                        task.wait(0.2)
-                    end
-                    
-                    if tabs.race.CFG.activeTp then
-                        tabs.race.StatusTp.Text = "Estado: ¡Sprint Final a Meta!"
-                        hum.WalkSpeed = tabs.race.CFG.runSpeed
-                        if finishPos then
-                            local tpFinishTriggered = false
-                            task.spawn(function()
-                                while tabs.race.CFG.activeTp and not tpFinishTriggered and utils.isCurrent() do
-                                    local _, currentHrp = getRaceChar()
-                                    if currentHrp and currentHrp.Position.X <= tabs.race.CFG.tpFinishX then
-                                        tpFinishTriggered = true
-                                        tabs.race.StatusTp.Text = "Estado: TP Instantáneo a Meta..."
-                                        tpRace(CFrame.new(finishPos))
-                                        break
-                                    end
-                                    task.wait(0.05)
-                                end
-                            end)
-                            moveRaceTo(finishPos, function() return tabs.race.CFG.activeTp end)
-                            tpFinishTriggered = true
-                        end
-                    end
-                    
-                    clicking = false
-                    clearRaceWall()
-                    tabs.race.StatusTp.Text = "Estado: ¡Carrera Completada!"
-                    resetRaceSpeed()
-                    task.wait(2)
-                end
-                task.wait(2)
-            end
-            clearRaceWall()
-            resetRaceSpeed()
-            tabs.race.StatusTp.Text = "Estado: Inactivo"
-        end)
-    else
-        clearRaceWall()
-        resetRaceSpeed()
-        tabs.race.StatusTp.Text = "Estado: Inactivo"
-    end
-end)
-switchTp:Set(false)
-
--- ==========================================
--- RESET MONITOR (-12640, 6, -4197)
--- ==========================================
-local lastRaceReset = 0
-task.spawn(function()
-    while utils.isCurrent() do
-        task.wait(0.2)
-        local isAnyActive = tabs.race.CFG.activeNormal or tabs.race.CFG.activeTp
-        if isAnyActive and (os.clock() - lastRaceReset > 5) then
-            local _, hrp = getRaceChar()
-            if hrp then
-                local dist = (hrp.Position - tabs.race.CFG.spawnPos).Magnitude
-                if dist <= tabs.race.CFG.spawnRadius then
-                    lastRaceReset = os.clock()
-                    task.spawn(function()
-                        if tabs.race.CFG.activeNormal then
-                            switchNormal:Set(false)
-                            task.wait(0.5)
-                            switchNormal:Set(true)
-                        elseif tabs.race.CFG.activeTp then
-                            switchTp:Set(false)
-                            task.wait(0.5)
-                            switchTp:Set(true)
-                        end
-                    end)
-                end
-            end
-        end
     end
 end)
 
@@ -2787,8 +2191,8 @@ tabs.other:AddSwitch("Hide UI Stats", function(state) privacyRedactor:SetStatsEn
 tabs.other:AddLabel("TELEPORTS")
 tabs.other:AddButton("Industrial Lift", function() utils.tpE(Vector3.new(-5491.68945, 81.2379913, 4643.85791)) end)
 tabs.other:AddButton("Industrial Squat", function() utils.tpE(Vector3.new(-5217.25049, 89.8445511, 5416.01025)) end)
-tabs.other:AddButton("Halloween Lift", function() utils.tpE(Vector3.new(5738, 86, 6415)) end)
-tabs.other:AddButton("Halloween Squat", function() utils.tpE(Vector3.new(4813, 85, 5840)) end)
+tabs.other:AddButton("Snow Lift", function() utils.tpE(Vector3.new(-5375, 48, 10322)) end)
+tabs.other:AddButton("Snow Squat", function() utils.tpE(Vector3.new(-5097, 48, 11094)) end)
 
 -- ==========================================
 -- TAB: INFO
