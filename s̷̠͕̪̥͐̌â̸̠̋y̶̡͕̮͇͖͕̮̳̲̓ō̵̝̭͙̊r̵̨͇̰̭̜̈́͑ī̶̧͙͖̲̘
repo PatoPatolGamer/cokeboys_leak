@@ -307,9 +307,9 @@ function utils.tpE(pos)
         local hrp = char:WaitForChild("HumanoidRootPart")
         hrp.CFrame = CFrame.new(pos)
         hrp.AssemblyLinearVelocity = Vector3.zero
-        task.wait(0.3)
+        task.wait(0.05)
         services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.08)
+        task.wait(0.02)
         services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
     end)
 end
@@ -453,6 +453,7 @@ local tabs = {
     boss = utils.ProyectadosHub:AddTab("Bosses"),
     clips = utils.ProyectadosHub:AddTab("PvP"),
     misiones = utils.ProyectadosHub:AddTab("Quests & Extras"),
+    pets = utils.ProyectadosHub:AddTab("Pets & Calc"),
     other = utils.ProyectadosHub:AddTab("Utilities"),
     info = utils.ProyectadosHub:AddTab("Info")
 }
@@ -1185,8 +1186,16 @@ local function setupSnowRespawn(pos, isSquat)
     tabs.configs[connKey] = lp.player.CharacterAdded:Connect(function(char)
         local activeCheck = isSquat and tabs.configs.SnowSquatLoopActive or tabs.configs.SnowLiftActive
         if not activeCheck or not utils.isCurrent() then return end
-        task.wait(1)
+        task.wait(0.3)
         pcall(function()
+            utils.tpE(Vector3.new(312, 19, 368))
+            task.wait(0.1)
+            local args = {
+                "travelToArea",
+                services.Workspace:WaitForChild("areaCircles"):WaitForChild("zeroDegreesGymCircle")
+            }
+            services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("areaTravelRemote"):InvokeServer(unpack(args))
+            task.wait(0.2)
             utils.tpE(pos)
         end)
     end)
@@ -1218,7 +1227,7 @@ task.spawn(function()
         task.wait(2)
         pcall(function()
             if tabs.configs.SnowLiftActive then
-                local targetPos = Vector3.new(-5375, 48, 10322)
+                local targetPos = Vector3.new(-5374, 71, 10321)
                 if isMachineOccupied(targetPos) then
                     tabs.configs.SnowLiftActive = false
                     if tabs.configs.SnowConnection then
@@ -1241,7 +1250,7 @@ task.spawn(function()
             end
 
             if tabs.configs.SnowSquatLoopActive then
-                local targetPos = Vector3.new(-5097, 48, 11094)
+                local targetPos = Vector3.new(-5099, 76, 11096)
                 if isMachineOccupied(targetPos) then
                     tabs.configs.SnowSquatLoopActive = false
                     if tabs.configs.SnowSquatConnection then
@@ -1268,9 +1277,19 @@ end)
 
 tabs.configs:AddSwitch("Farm Snow Lift", function(state)
     tabs.configs.SnowLiftActive = state
-    local targetPos = Vector3.new(-5375, 48, 10322)
+    local targetPos = Vector3.new(-5374, 71, 10321)
     if state then
-        pcall(function() utils.tpE(targetPos) end)
+        pcall(function()
+            utils.tpE(Vector3.new(312, 19, 368))
+            task.wait(0.1)
+            local args = {
+                "travelToArea",
+                services.Workspace:WaitForChild("areaCircles"):WaitForChild("zeroDegreesGymCircle")
+            }
+            services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("areaTravelRemote"):InvokeServer(unpack(args))
+            task.wait(0.2)
+            utils.tpE(targetPos)
+        end)
         setupSnowRespawn(targetPos, false)
     else
         if tabs.configs.SnowConnection then
@@ -1284,9 +1303,19 @@ end):Set(false)
 
 tabs.configs:AddSwitch("Farm Snow Squat", function(state)
     tabs.configs.SnowSquatLoopActive = state
-    local targetPos = Vector3.new(-5097, 48, 11094)
+    local targetPos = Vector3.new(-5099, 76, 11096)
     if state then
-        pcall(function() utils.tpE(targetPos) end)
+        pcall(function()
+            utils.tpE(Vector3.new(312, 19, 368))
+            task.wait(0.1)
+            local args = {
+                "travelToArea",
+                services.Workspace:WaitForChild("areaCircles"):WaitForChild("zeroDegreesGymCircle")
+            }
+            services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("areaTravelRemote"):InvokeServer(unpack(args))
+            task.wait(0.2)
+            utils.tpE(targetPos)
+        end)
         setupSnowRespawn(targetPos, true)
     else
         if tabs.configs.SnowSquatConnection then
@@ -1529,7 +1558,6 @@ tabs.boss.NormalBossToggle = tabs.boss:AddSwitch("Auto Farm Normal Boss", functi
     end)
 end)
 
--- Cargamos los nombres internamente para evitar bugs en otras partes del script
 for _, name in ipairs(halloweenBossNames) do
     tabs.boss.HalloweenData.HalloweenBosses[name] = true
 end
@@ -1537,7 +1565,7 @@ end
 -- ==========================================
 -- HALLOWEEN BOSSES (OCULTOS TEMPORALMENTE)
 -- ==========================================
-local MOSTRAR_HALLOWEEN_BOSSES = false -- ¡Cambia esto a 'true' para reactivar el menú de los jefes de Halloween!
+local MOSTRAR_HALLOWEEN_BOSSES = false 
 
 if MOSTRAR_HALLOWEEN_BOSSES then
     tabs.boss:AddLabel("HALLOWEEN BOSSES")
@@ -1949,6 +1977,176 @@ tabs.misiones:AddSwitch("Auto Spin Wheel", function(bool)
     end
 end)
 
+
+-- ==========================================
+-- TAB: PETS & CALCULATOR
+-- ==========================================
+tabs.pets:AddLabel("PET LEVEL CALCULATOR")
+
+tabs.pets.SelectedDisplay = nil
+tabs.pets.CurrentLevel = 1
+tabs.pets.CurrentXP = 0
+tabs.pets.TargetLevel = 350
+tabs.pets.PetMap = {}
+
+tabs.pets.SelectedStatsLabel = tabs.pets:AddLabel("Selected: None | Lvl: 1 | XP: 0")
+tabs.pets.SelectedStatsLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
+
+local function toRoman(num)
+    if type(num) ~= "number" or num <= 0 then return "" end
+    local roman = ""
+    local numerals = {
+        {1000, "M"}, {900, "CM"}, {500, "D"}, {400, "CD"},
+        {100, "C"}, {90, "XC"}, {50, "L"}, {40, "XL"},
+        {10, "X"}, {9, "IX"}, {5, "V"}, {4, "IV"}, {1, "I"}
+    }
+    for _, v in ipairs(numerals) do
+        while num >= v[1] do
+            roman = roman .. v[2]
+            num = num - v[1]
+        end
+    end
+    return roman
+end
+
+tabs.pets.PetDropdown = tabs.pets:AddDropdown("Select Pet", function(displayStr)
+    tabs.pets.SelectedDisplay = displayStr
+    local pet = tabs.pets.PetMap[displayStr]
+    if pet then
+        local lvlObj = pet:FindFirstChild("level") or pet:FindFirstChild("Level")
+        local xpObj = pet:FindFirstChild("xp") or pet:FindFirstChild("XP") or pet:FindFirstChild("currentXP")
+        local lvl = lvlObj and tonumber(lvlObj.Value) or 1
+        local xp = xpObj and tonumber(xpObj.Value) or 0
+        
+        tabs.pets.CurrentLevel = math.clamp(lvl, 1, 350)
+        tabs.pets.CurrentXP = xp
+        tabs.pets.SelectedStatsLabel.Text = string.format("Selected: %s | Lvl: %d | XP: %s", pet.Name, lvl, utils.formatWithCommas(xp))
+    end
+end)
+
+tabs.pets.refreshPets = function()
+    pcall(function()
+        if tabs.pets.PetDropdown.Clear then
+            tabs.pets.PetDropdown:Clear()
+        end
+    end)
+    
+    tabs.pets.PetMap = {}
+    
+    if lp.player:FindFirstChild("petsFolder") then
+        for _, folder in pairs(lp.player.petsFolder:GetChildren()) do
+            if folder:IsA("Folder") then
+                for _, pet in pairs(folder:GetChildren()) do
+                    
+                    local lvlObj = pet:FindFirstChild("level") or pet:FindFirstChild("Level")
+                    local lvl = lvlObj and tonumber(lvlObj.Value) or 1
+                    
+                    -- Búsqueda segura de encantamiento (solo si existe y es válido)
+                    local enchantObj = pet:FindFirstChild("enchant") or pet:FindFirstChild("Enchant") or pet:FindFirstChild("enchantment") or pet:FindFirstChild("Enchantment")
+                    local enchantLvlObj = pet:FindFirstChild("enchantLevel") or pet:FindFirstChild("EnchantLevel") or pet:FindFirstChild("enchantLvl")
+                    
+                    local enchantName = ""
+                    if enchantObj and enchantObj.Value ~= nil then
+                        enchantName = tostring(enchantObj.Value)
+                    else
+                        local attrEnchant = pet:GetAttribute("enchant") or pet:GetAttribute("Enchant")
+                        if attrEnchant then enchantName = tostring(attrEnchant) end
+                    end
+                    
+                    local enchantLvl = 0
+                    if enchantLvlObj and enchantLvlObj.Value ~= nil then
+                        enchantLvl = tonumber(enchantLvlObj.Value) or 0
+                    else
+                        local attrLvl = pet:GetAttribute("enchantLevel") or pet:GetAttribute("EnchantLevel")
+                        if attrLvl then enchantLvl = tonumber(attrLvl) or 0 end
+                    end
+                    
+                    local displayStr = string.format("%s [Lv.%d]", pet.Name, lvl)
+                    
+                    if enchantName ~= "" and enchantName ~= "None" and enchantName ~= "nil" and enchantName ~= "false" then
+                        local romanLvl = toRoman(enchantLvl)
+                        if romanLvl ~= "" then
+                            displayStr = displayStr .. string.format(" [%s %s]", enchantName, romanLvl)
+                        else
+                            displayStr = displayStr .. string.format(" [%s]", enchantName)
+                        end
+                    end
+                    
+                    if tabs.pets.PetMap[displayStr] then
+                        local count = 2
+                        while tabs.pets.PetMap[displayStr .. " (" .. count .. ")"] do
+                            count = count + 1
+                        end
+                        displayStr = displayStr .. " (" .. count .. ")"
+                    end
+                    
+                    tabs.pets.PetMap[displayStr] = pet
+                    pcall(function() tabs.pets.PetDropdown:Add(displayStr) end)
+                end
+            end
+        end
+    end
+end
+
+tabs.pets:AddButton("Refresh Owned Pets", function()
+    tabs.pets.refreshPets()
+end)
+
+task.delay(2, function() tabs.pets.refreshPets() end)
+
+tabs.pets:AddLabel("------------------------")
+
+tabs.pets:AddTextBox("Target Level (Def: 350):", function(text)
+    local num = tonumber(text)
+    if num then tabs.pets.TargetLevel = math.clamp(math.floor(num), 1, 350) end
+end, {clear = false})
+
+tabs.pets.TimeLabel = tabs.pets:AddLabel("Time Remaining: --")
+tabs.pets.XpLabel = tabs.pets:AddLabel("XP Required: --")
+tabs.pets.StatLabel = tabs.pets:AddLabel("Stat Bonus Added: --")
+tabs.pets.TimeLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+tabs.pets.StatLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
+
+tabs.pets:AddButton("Calculate", function()
+    local cLvl = tabs.pets.CurrentLevel
+    local cXp = tabs.pets.CurrentXP
+    local tLvl = tabs.pets.TargetLevel
+    
+    if cLvl >= tLvl then
+        tabs.pets.TimeLabel.Text = "Time Remaining: Target reached!"
+        tabs.pets.XpLabel.Text = "XP Required: 0"
+        tabs.pets.StatLabel.Text = "Stat Bonus Added: 0%"
+        return
+    end
+
+    local MAX_LEVEL = 350
+    local TOTAL_MINS = 150 * 60 
+    local EXPONENT = 2
+
+    local function getMins(level)
+        if level <= 1 then return 0 end
+        return TOTAL_MINS * math.pow((level - 1) / (MAX_LEVEL - 1), EXPONENT)
+    end
+
+    local minsRemaining = getMins(tLvl) - getMins(cLvl)
+    
+    local minsSavedByXp = cXp / 100
+    minsRemaining = math.max(0, minsRemaining - minsSavedByXp)
+    
+    local xpRequired = minsRemaining * 100
+    local statAdded = (tLvl - cLvl) * 0.20
+
+    local hours = math.floor(minsRemaining / 60)
+    local mins = math.floor(minsRemaining % 60)
+
+    tabs.pets.TimeLabel.Text = string.format("Time Remaining: %dh %dm", hours, mins)
+    tabs.pets.XpLabel.Text = "XP Required: " .. utils.formatWithCommas(xpRequired)
+    tabs.pets.StatLabel.Text = string.format("Stat Bonus Added: +%.2f%%", statAdded)
+end)
+
+tabs.pets:AddLabel("Note: Uses estimated curve based on 150h max")
+
+
 -- ==========================================
 -- TAB: UTILITIES
 -- ==========================================
@@ -2191,8 +2389,8 @@ tabs.other:AddSwitch("Hide UI Stats", function(state) privacyRedactor:SetStatsEn
 tabs.other:AddLabel("TELEPORTS")
 tabs.other:AddButton("Industrial Lift", function() utils.tpE(Vector3.new(-5491.68945, 81.2379913, 4643.85791)) end)
 tabs.other:AddButton("Industrial Squat", function() utils.tpE(Vector3.new(-5217.25049, 89.8445511, 5416.01025)) end)
-tabs.other:AddButton("Snow Lift", function() utils.tpE(Vector3.new(-5375, 48, 10322)) end)
-tabs.other:AddButton("Snow Squat", function() utils.tpE(Vector3.new(-5097, 48, 11094)) end)
+tabs.other:AddButton("Snow Lift", function() utils.tpE(Vector3.new(-5374, 71, 10321)) end)
+tabs.other:AddButton("Snow Squat", function() utils.tpE(Vector3.new(-5099, 76, 11096)) end)
 
 -- ==========================================
 -- TAB: INFO
