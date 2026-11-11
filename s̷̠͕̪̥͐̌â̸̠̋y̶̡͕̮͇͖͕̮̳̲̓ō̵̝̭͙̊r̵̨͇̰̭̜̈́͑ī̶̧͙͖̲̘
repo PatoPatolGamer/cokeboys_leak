@@ -314,6 +314,41 @@ function utils.tpE(pos)
     end)
 end
 
+local function interactWithMachine(targetPos)
+    pcall(function()
+        local char = lp.player.Character or lp.player.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        local hum = char:WaitForChild("Humanoid")
+        
+        hrp.CFrame = CFrame.new(targetPos)
+        hrp.AssemblyLinearVelocity = Vector3.zero
+        task.wait(0.2)
+        
+        -- Intentar interactuar invocando el Remote directo de la máquina si existe en el área
+        if services.Workspace:FindFirstChild("machinesFolder") then
+            for _, machine in ipairs(services.Workspace.machinesFolder:GetChildren()) do
+                local seat = machine:FindFirstChild("interactSeat") or machine:FindFirstChild("Seat") or machine:FindFirstChild("Part")
+                if seat and (seat.Position - targetPos).Magnitude < 15 then
+                    pcall(function()
+                        utils.remotes.MachineInteract:InvokeServer("interact", machine)
+                    end)
+                    break
+                end
+            end
+        end
+        
+        -- Reintento de pulsación de E hasta que el personaje esté sentado
+        local startTime = os.clock()
+        while os.clock() - startTime < 2.5 and not hum.Sit do
+            hrp.CFrame = CFrame.new(targetPos)
+            services.VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            services.VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            task.wait(0.15)
+        end
+    end)
+end
+
 function formatNumberSilence(num)
     if num >= 1e18 then return string.format("%.2fQi", num/1e18) end
     if num >= 1e15 then return string.format("%.2fQa", num/1e15) end
@@ -772,9 +807,6 @@ tabs.fullFarm.updateAdaptiveRate = function()
         elseif not tab.learnedLimit then
             tab.sendRate = math.min(tab.maxSendRate, tab.sendRate + tab.fineRampStep)
             tab.stableSince = now
-        elseif now - tab.stableSince >= tab.stableInterval then
-            tab.sendRate = math.min(tab.maxSendRate, tab.sendRate + tab.stableStep)
-            tab.stableSince = now
         end
         tab.lastRampAt = now
     end
@@ -1186,17 +1218,17 @@ local function setupSnowRespawn(pos, isSquat)
     tabs.configs[connKey] = lp.player.CharacterAdded:Connect(function(char)
         local activeCheck = isSquat and tabs.configs.SnowSquatLoopActive or tabs.configs.SnowLiftActive
         if not activeCheck or not utils.isCurrent() then return end
-        task.wait(0.3)
+        task.wait(0.5)
         pcall(function()
             utils.tpE(Vector3.new(312, 19, 368))
-            task.wait(0.1)
+            task.wait(0.15)
             local args = {
                 "travelToArea",
                 services.Workspace:WaitForChild("areaCircles"):WaitForChild("zeroDegreesGymCircle")
             }
             services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("areaTravelRemote"):InvokeServer(unpack(args))
-            task.wait(0.2)
-            utils.tpE(pos)
+            task.wait(0.4)
+            interactWithMachine(pos)
         end)
     end)
 end
@@ -1281,14 +1313,14 @@ tabs.configs:AddSwitch("Farm Snow Lift", function(state)
     if state then
         pcall(function()
             utils.tpE(Vector3.new(312, 19, 368))
-            task.wait(0.1)
+            task.wait(0.15)
             local args = {
                 "travelToArea",
                 services.Workspace:WaitForChild("areaCircles"):WaitForChild("zeroDegreesGymCircle")
             }
             services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("areaTravelRemote"):InvokeServer(unpack(args))
-            task.wait(0.2)
-            utils.tpE(targetPos)
+            task.wait(0.4)
+            interactWithMachine(targetPos)
         end)
         setupSnowRespawn(targetPos, false)
     else
@@ -1307,14 +1339,14 @@ tabs.configs:AddSwitch("Farm Snow Squat", function(state)
     if state then
         pcall(function()
             utils.tpE(Vector3.new(312, 19, 368))
-            task.wait(0.1)
+            task.wait(0.15)
             local args = {
                 "travelToArea",
                 services.Workspace:WaitForChild("areaCircles"):WaitForChild("zeroDegreesGymCircle")
             }
             services.ReplicatedStorage:WaitForChild("rEvents"):WaitForChild("areaTravelRemote"):InvokeServer(unpack(args))
-            task.wait(0.2)
-            utils.tpE(targetPos)
+            task.wait(0.4)
+            interactWithMachine(targetPos)
         end)
         setupSnowRespawn(targetPos, true)
     else
@@ -1979,18 +2011,190 @@ end)
 
 
 -- ==========================================
--- TAB: PETS & CALCULATOR
+-- TAB: PETS & CALCULATOR (LIVE TRACKER EXACTO)
 -- ==========================================
-tabs.pets:AddLabel("PET LEVEL CALCULATOR")
+local dummyLabelForParent = tabs.pets:AddLabel("PET PROGRESS TRACKER")
 
 tabs.pets.SelectedDisplay = nil
-tabs.pets.CurrentLevel = 1
-tabs.pets.CurrentXP = 0
-tabs.pets.TargetLevel = 350
 tabs.pets.PetMap = {}
 
-tabs.pets.SelectedStatsLabel = tabs.pets:AddLabel("Selected: None | Lvl: 1 | XP: 0")
-tabs.pets.SelectedStatsLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
+-- UI de la Barra Visual (Estilo Muscle Legends)
+local trackerContainer = Instance.new("Frame")
+trackerContainer.Name = "PetTrackerContainer"
+trackerContainer.Size = UDim2.new(0.9, 0, 0, 60)
+trackerContainer.BackgroundTransparency = 1
+trackerContainer.Parent = dummyLabelForParent.Parent
+dummyLabelForParent:Destroy()
+
+local levelTitle = Instance.new("TextLabel")
+levelTitle.Size = UDim2.new(1, 0, 0, 25)
+levelTitle.Position = UDim2.new(0, 0, 0, 0)
+levelTitle.BackgroundTransparency = 1
+levelTitle.Text = "Level --"
+levelTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+levelTitle.Font = Enum.Font.GothamBlack
+levelTitle.TextSize = 22
+levelTitle.Parent = trackerContainer
+
+local uiStrokeTitle = Instance.new("UIStroke")
+uiStrokeTitle.Color = Color3.fromRGB(0, 0, 0)
+uiStrokeTitle.Thickness = 2
+uiStrokeTitle.Parent = levelTitle
+
+local barBackground = Instance.new("Frame")
+barBackground.Size = UDim2.new(1, 0, 0, 25)
+barBackground.Position = UDim2.new(0, 0, 0, 30)
+barBackground.BackgroundColor3 = Color3.fromRGB(30, 20, 10)
+barBackground.BorderSizePixel = 0
+barBackground.Parent = trackerContainer
+
+local barCorner = Instance.new("UICorner")
+barCorner.CornerRadius = UDim.new(0, 4)
+barCorner.Parent = barBackground
+
+local barStroke = Instance.new("UIStroke")
+barStroke.Color = Color3.fromRGB(0, 0, 0)
+barStroke.Thickness = 2
+barStroke.Parent = barBackground
+
+local barFill = Instance.new("Frame")
+barFill.Size = UDim2.new(0, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(255, 190, 0)
+barFill.BorderSizePixel = 0
+barFill.Parent = barBackground
+
+local barFillCorner = Instance.new("UICorner")
+barFillCorner.CornerRadius = UDim.new(0, 4)
+barFillCorner.Parent = barFill
+
+local expText = Instance.new("TextLabel")
+expText.Size = UDim2.new(1, 0, 1, 0)
+expText.BackgroundTransparency = 1
+expText.Text = "0/0 Exp"
+expText.TextColor3 = Color3.fromRGB(255, 255, 255)
+expText.Font = Enum.Font.GothamBold
+expText.TextSize = 15
+expText.Parent = barBackground
+
+local expStroke = Instance.new("UIStroke")
+expStroke.Color = Color3.fromRGB(0, 0, 0)
+expStroke.Thickness = 1.5
+expStroke.Parent = expText
+
+tabs.pets:AddLabel("------------------------")
+local rateLabel = tabs.pets:AddLabel("Gain Rate: Calculating... (Equip pet)")
+local nextLevelLabel = tabs.pets:AddLabel("Next Level ETA: --")
+local maxLevelLabel = tabs.pets:AddLabel("Max Level (350) ETA: --")
+rateLabel.TextColor3 = Color3.fromRGB(150, 200, 255)
+nextLevelLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+maxLevelLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
+
+local petTracker = {
+    ConnectionXP = nil,
+    ConnectionLvl = nil,
+    SelectedPet = nil,
+    History = {},
+    LastLevel = 0
+}
+
+local function formatTimeETA(seconds)
+    if seconds == math.huge or seconds < 0 then return "Infinite (Not gaining XP)" end
+    local days = math.floor(seconds / 86400)
+    local hours = math.floor((seconds % 86400) / 3600)
+    local mins = math.floor((seconds % 3600) / 60)
+    local secs = math.floor(seconds % 60)
+    
+    if days > 0 then return string.format("%dd %dh %dm", days, hours, mins)
+    elseif hours > 0 then return string.format("%dh %dm %ds", hours, mins, secs)
+    else return string.format("%dm %ds", mins, secs) end
+end
+
+local function getPetData(pet)
+    local lvlObj = pet:FindFirstChild("level") or pet:FindFirstChild("Level")
+    local xpObj = pet:FindFirstChild("xp") or pet:FindFirstChild("XP") or pet:FindFirstChild("currentXP")
+    local maxObj = pet:FindFirstChild("maxXP") or pet:FindFirstChild("MaxXP") or pet:FindFirstChild("xpNeeded") or pet:FindFirstChild("XPNeeded")
+    
+    local currentLvl = lvlObj and tonumber(lvlObj.Value) or 1
+    local currentXp = xpObj and tonumber(xpObj.Value) or 0
+    local maxXp = 0
+    
+    if maxObj and tonumber(maxObj.Value) then
+        maxXp = tonumber(maxObj.Value)
+    else
+        maxXp = math.floor(16.747 * currentLvl) 
+        if maxXp < 100 then maxXp = 100 end
+    end
+    return currentLvl, currentXp, maxXp
+end
+
+local function updateTracker(pet)
+    if not pet or not pet.Parent then return end
+    
+    local currentLvl, currentXp, maxXp = getPetData(pet)
+    local now = os.clock()
+    
+    if currentLvl ~= petTracker.LastLevel then
+        petTracker.History = {}
+        petTracker.LastLevel = currentLvl
+    end
+    
+    table.insert(petTracker.History, {xp = currentXp, time = now})
+    for i = #petTracker.History, 1, -1 do
+        if now - petTracker.History[i].time > 15 then
+            table.remove(petTracker.History, i)
+        end
+    end
+    
+    local xpPerSec = 0
+    if #petTracker.History >= 2 then
+        local first = petTracker.History[1]
+        local last = petTracker.History[#petTracker.History]
+        local dt = last.time - first.time
+        if dt > 0 then
+            xpPerSec = (last.xp - first.xp) / dt
+        end
+    end
+    
+    if xpPerSec < 0 then xpPerSec = 0 end
+    
+    levelTitle.Text = "Level " .. tostring(currentLvl)
+    if currentLvl >= 350 then
+        barFill.Size = UDim2.new(1, 0, 1, 0)
+        expText.Text = "MAX LEVEL"
+        rateLabel.Text = "Gain Rate: MAXED"
+        nextLevelLabel.Text = "Next Level ETA: COMPLETED"
+        maxLevelLabel.Text = "Max Level (350) ETA: COMPLETED"
+        return
+    end
+    
+    local progress = math.clamp(currentXp / math.max(1, maxXp), 0, 1)
+    barFill.Size = UDim2.new(progress, 0, 1, 0)
+    expText.Text = string.format("%s/%s Exp", utils.formatWithCommas(currentXp), utils.formatWithCommas(maxXp))
+    
+    if xpPerSec > 0 then
+        rateLabel.Text = string.format("Gain Rate: %.1f Exp/s", xpPerSec)
+        
+        local xpNeededNext = math.max(0, maxXp - currentXp)
+        local secToNext = xpNeededNext / xpPerSec
+        nextLevelLabel.Text = "Next Level ETA: " .. formatTimeETA(secToNext)
+        
+        local TOTAL_MINS = 150 * 60
+        local function getMinsForLevel(lvl) return TOTAL_MINS * math.pow((lvl - 1) / 349, 2) end
+        
+        local minsCurrent = getMinsForLevel(currentLvl)
+        local minsNext = getMinsForLevel(currentLvl + 1)
+        local minsMax = getMinsForLevel(350)
+        
+        local minsRemainingCurve = (minsMax - minsCurrent) - (progress * (minsNext - minsCurrent))
+        local secToMax = minsRemainingCurve * 60
+        
+        maxLevelLabel.Text = "Max Level (350) ETA: " .. formatTimeETA(secToMax)
+    else
+        rateLabel.Text = "Gain Rate: 0 Exp/s (Pet not equipped?)"
+        nextLevelLabel.Text = "Next Level ETA: Paused"
+        maxLevelLabel.Text = "Max Level (350) ETA: Paused"
+    end
+end
 
 local function toRoman(num)
     if type(num) ~= "number" or num <= 0 then return "" end
@@ -2012,15 +2216,24 @@ end
 tabs.pets.PetDropdown = tabs.pets:AddDropdown("Select Pet", function(displayStr)
     tabs.pets.SelectedDisplay = displayStr
     local pet = tabs.pets.PetMap[displayStr]
+    
+    if petTracker.ConnectionXP then petTracker.ConnectionXP:Disconnect() end
+    if petTracker.ConnectionLvl then petTracker.ConnectionLvl:Disconnect() end
+    petTracker.History = {}
+    
     if pet then
+        petTracker.SelectedPet = pet
+        updateTracker(pet)
+        
         local lvlObj = pet:FindFirstChild("level") or pet:FindFirstChild("Level")
         local xpObj = pet:FindFirstChild("xp") or pet:FindFirstChild("XP") or pet:FindFirstChild("currentXP")
-        local lvl = lvlObj and tonumber(lvlObj.Value) or 1
-        local xp = xpObj and tonumber(xpObj.Value) or 0
         
-        tabs.pets.CurrentLevel = math.clamp(lvl, 1, 350)
-        tabs.pets.CurrentXP = xp
-        tabs.pets.SelectedStatsLabel.Text = string.format("Selected: %s | Lvl: %d | XP: %s", pet.Name, lvl, utils.formatWithCommas(xp))
+        if xpObj then
+            petTracker.ConnectionXP = xpObj.Changed:Connect(function() updateTracker(pet) end)
+        end
+        if lvlObj then
+            petTracker.ConnectionLvl = lvlObj.Changed:Connect(function() updateTracker(pet) end)
+        end
     end
 end)
 
@@ -2041,8 +2254,7 @@ tabs.pets.refreshPets = function()
                     local lvlObj = pet:FindFirstChild("level") or pet:FindFirstChild("Level")
                     local lvl = lvlObj and tonumber(lvlObj.Value) or 1
                     
-                    -- Búsqueda segura de encantamiento (solo si existe y es válido)
-                    local enchantObj = pet:FindFirstChild("enchant") or pet:FindFirstChild("Enchant") or pet:FindFirstChild("enchantment") or pet:FindFirstChild("Enchantment")
+                    local enchantObj = pet:FindFirstChild("enchant") or pet:FindFirstChild("Enchant") or pet:FindFirstChild("enchantment")
                     local enchantLvlObj = pet:FindFirstChild("enchantLevel") or pet:FindFirstChild("EnchantLevel") or pet:FindFirstChild("enchantLvl")
                     
                     local enchantName = ""
@@ -2093,59 +2305,6 @@ tabs.pets:AddButton("Refresh Owned Pets", function()
 end)
 
 task.delay(2, function() tabs.pets.refreshPets() end)
-
-tabs.pets:AddLabel("------------------------")
-
-tabs.pets:AddTextBox("Target Level (Def: 350):", function(text)
-    local num = tonumber(text)
-    if num then tabs.pets.TargetLevel = math.clamp(math.floor(num), 1, 350) end
-end, {clear = false})
-
-tabs.pets.TimeLabel = tabs.pets:AddLabel("Time Remaining: --")
-tabs.pets.XpLabel = tabs.pets:AddLabel("XP Required: --")
-tabs.pets.StatLabel = tabs.pets:AddLabel("Stat Bonus Added: --")
-tabs.pets.TimeLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
-tabs.pets.StatLabel.TextColor3 = Color3.fromRGB(255, 180, 70)
-
-tabs.pets:AddButton("Calculate", function()
-    local cLvl = tabs.pets.CurrentLevel
-    local cXp = tabs.pets.CurrentXP
-    local tLvl = tabs.pets.TargetLevel
-    
-    if cLvl >= tLvl then
-        tabs.pets.TimeLabel.Text = "Time Remaining: Target reached!"
-        tabs.pets.XpLabel.Text = "XP Required: 0"
-        tabs.pets.StatLabel.Text = "Stat Bonus Added: 0%"
-        return
-    end
-
-    local MAX_LEVEL = 350
-    local TOTAL_MINS = 150 * 60 
-    local EXPONENT = 2
-
-    local function getMins(level)
-        if level <= 1 then return 0 end
-        return TOTAL_MINS * math.pow((level - 1) / (MAX_LEVEL - 1), EXPONENT)
-    end
-
-    local minsRemaining = getMins(tLvl) - getMins(cLvl)
-    
-    local minsSavedByXp = cXp / 100
-    minsRemaining = math.max(0, minsRemaining - minsSavedByXp)
-    
-    local xpRequired = minsRemaining * 100
-    local statAdded = (tLvl - cLvl) * 0.20
-
-    local hours = math.floor(minsRemaining / 60)
-    local mins = math.floor(minsRemaining % 60)
-
-    tabs.pets.TimeLabel.Text = string.format("Time Remaining: %dh %dm", hours, mins)
-    tabs.pets.XpLabel.Text = "XP Required: " .. utils.formatWithCommas(xpRequired)
-    tabs.pets.StatLabel.Text = string.format("Stat Bonus Added: +%.2f%%", statAdded)
-end)
-
-tabs.pets:AddLabel("Note: Uses estimated curve based on 150h max")
-
 
 -- ==========================================
 -- TAB: UTILITIES
