@@ -324,7 +324,6 @@ local function interactWithMachine(targetPos)
         hrp.AssemblyLinearVelocity = Vector3.zero
         task.wait(0.2)
         
-        -- Intentar interactuar invocando el Remote directo de la máquina si existe en el área
         if services.Workspace:FindFirstChild("machinesFolder") then
             for _, machine in ipairs(services.Workspace.machinesFolder:GetChildren()) do
                 local seat = machine:FindFirstChild("interactSeat") or machine:FindFirstChild("Seat") or machine:FindFirstChild("Part")
@@ -337,7 +336,6 @@ local function interactWithMachine(targetPos)
             end
         end
         
-        -- Reintento de pulsación de E hasta que el personaje esté sentado
         local startTime = os.clock()
         while os.clock() - startTime < 2.5 and not hum.Sit do
             hrp.CFrame = CFrame.new(targetPos)
@@ -481,15 +479,15 @@ utils.connect(lp.player.CharacterAdded, function(character)
 end)
 
 local tabs = {
-    farming = utils.ProyectadosHub:AddTab("Training"),
-    fullFarm = utils.ProyectadosHub:AddTab("Fast Farm"),
-    fullRebirth = utils.ProyectadosHub:AddTab("Auto Rebirth"),
-    configs = utils.ProyectadosHub:AddTab("Zones"),
-    boss = utils.ProyectadosHub:AddTab("Bosses"),
-    clips = utils.ProyectadosHub:AddTab("PvP"),
-    misiones = utils.ProyectadosHub:AddTab("Quests & Extras"),
-    pets = utils.ProyectadosHub:AddTab("Pets & Calc"),
-    other = utils.ProyectadosHub:AddTab("Utilities"),
+    farming = utils.ProyectadosHub:AddTab("Farm"),
+    fullFarm = utils.ProyectadosHub:AddTab("Fast"),
+    fullRebirth = utils.ProyectadosHub:AddTab("Rebirth"),
+    configs = utils.ProyectadosHub:AddTab("Config"),
+    boss = utils.ProyectadosHub:AddTab("Boss"),
+    clips = utils.ProyectadosHub:AddTab("Kill"),
+    misiones = utils.ProyectadosHub:AddTab("Extras"),
+    pets = utils.ProyectadosHub:AddTab("Pet Xp"),
+    other = utils.ProyectadosHub:AddTab("Util"),
     info = utils.ProyectadosHub:AddTab("Info")
 }
 
@@ -506,7 +504,7 @@ local function formatCurrentStat(value)
 end
 
 -- ==========================================
--- TAB: TRAINING
+-- TAB: FARM (ENTRENAMIENTO BÁSICO)
 -- ==========================================
 tabs.farming:AddLabel("BASIC TRAINING")
 tabs.farming.AutoLiftSpeed = 0.06
@@ -613,7 +611,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: FAST FARM 
+-- TAB: FAST 
 -- ==========================================
 tabs.fullFarm:AddLabel("REAL-TIME STATS")
 
@@ -919,7 +917,7 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- TAB: AUTO REBIRTH & CALCULATOR 
+-- TAB: REBIRTH 
 -- ==========================================
 tabs.fullRebirth.FastRebirthV2Data = {
     Running = false,
@@ -1169,7 +1167,7 @@ autoRebirthToggleRef = tabs.fullRebirth:AddSwitch("Auto Rebirth", function(state
 end)
 
 -- ==========================================
--- TAB: ZONES
+-- TAB: CONFIG (ZONAS Y MAQUINAS)
 -- ==========================================
 tabs.configs:AddLabel("MUSCLE KING ZONE")
 tabs.configs.KingData = {TargetPosition = CFrame.new(-8749, 124, -5861), TeleportActive = false}
@@ -1367,7 +1365,7 @@ tabs.configs:AddSwitch("Auto Rebirth (Zones)", function(state)
 end):Set(false)
 
 -- ==========================================
--- TAB: BOSSES
+-- TAB: BOSS
 -- ==========================================
 tabs.boss.NormalData = {
     Running = false,
@@ -1754,7 +1752,7 @@ pcall(function()
 end)
 
 -- ==========================================
--- TAB: PvP
+-- TAB: KILL (PVP)
 -- ==========================================
 tabs.clips:AddLabel("KILL AURA (DEATH RING)")
 local AuraConfig = { Enabled = false, Range = 20, RingPart = nil }
@@ -1825,7 +1823,7 @@ AuraConfig.Toggle = tabs.clips:AddSwitch("Toggle Kill Aura", function(state)
 end)
 
 -- ==========================================
--- TAB: QUESTS & EXTRAS
+-- TAB: EXTRAS (QUESTS & EXTRAS)
 -- ==========================================
 tabs.misiones:AddLabel("QUESTS")
 tabs.misiones.AutoQuestActive = false
@@ -2009,9 +2007,8 @@ tabs.misiones:AddSwitch("Auto Spin Wheel", function(bool)
     end
 end)
 
-
 -- ==========================================
--- TAB: PETS & CALCULATOR (LIVE TRACKER EXACTO)
+-- TAB: PET XP (TRACKER Y CALCULADORA DE PETS)
 -- ==========================================
 local dummyLabelForParent = tabs.pets:AddLabel("PET PROGRESS TRACKER")
 
@@ -2307,7 +2304,7 @@ end)
 task.delay(2, function() tabs.pets.refreshPets() end)
 
 -- ==========================================
--- TAB: UTILITIES
+-- TAB: UTIL (UTILIDADES Y AJUSTES)
 -- ==========================================
 tabs.other:AddLabel("PROTECTION")
 local protection = { AntiFling = false, PositionLock = false, LockedPos = nil }
