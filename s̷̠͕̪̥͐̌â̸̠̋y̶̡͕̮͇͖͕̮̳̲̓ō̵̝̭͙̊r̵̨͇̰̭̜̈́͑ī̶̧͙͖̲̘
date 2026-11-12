@@ -257,6 +257,12 @@ local function readDataPing()
     if success and type(ping) == "number" and ping == ping and ping >= 0 and ping < math.huge then
         return ping
     end
+    local fallbackOk, netPing = pcall(function()
+        return lp.player:GetNetworkPing() * 1000
+    end)
+    if fallbackOk and type(netPing) == "number" and netPing == netPing and netPing >= 0 and netPing < math.huge then
+        return netPing
+    end
     return nil
 end
 
@@ -619,6 +625,10 @@ tabs.fullFarm.leaderstats = lp.player:WaitForChild("leaderstats")
 tabs.fullFarm.strength = tabs.fullFarm.leaderstats:WaitForChild("Strength")
 tabs.fullFarm.durability = lp.player:WaitForChild("Durability")
 tabs.fullFarm.running = false
+tabs.fullFarm.adaptiveRunning = false
+tabs.fullFarm.directRunning = false
+tabs.fullFarm.switchingMode = false
+tabs.fullFarm.workerGen = 0
 tabs.fullFarm.startedAt = 0
 tabs.fullFarm.totalElapsed = 0
 tabs.fullFarm.timerStarted = false
@@ -628,25 +638,25 @@ tabs.fullFarm.statSamples = {Strength = tabs.fullFarm.strength.Value, Durability
 tabs.fullFarm.statGains = {Strength = 0, Durability = 0}
 tabs.fullFarm.nextAverageElapsed = 5
 
-tabs.fullFarm.initialSendRate = 300
-tabs.fullFarm.maxSendRate = 480
+tabs.fullFarm.initialSendRate = 200
+tabs.fullFarm.maxSendRate = 400
 tabs.fullFarm.sendRate = tabs.fullFarm.initialSendRate
-tabs.fullFarm.maxBurst = 24
+tabs.fullFarm.maxBurst = 12
 tabs.fullFarm.Tokens = 0
-tabs.fullFarm.pingLimit = 350
+tabs.fullFarm.pingLimit = 400
 tabs.fullFarm.resumePing = 300
-tabs.fullFarm.recoverySeconds = 2
-tabs.fullFarm.rampInterval = 2
-tabs.fullFarm.rampStep = 25
-tabs.fullFarm.minAdaptiveRate = 450
-tabs.fullFarm.fineRampStep = 2
-tabs.fullFarm.backoffStep = 4
+tabs.fullFarm.recoverySeconds = 1.5
+tabs.fullFarm.rampInterval = 1.5
+tabs.fullFarm.rampStep = 20
+tabs.fullFarm.minAdaptiveRate = 80
+tabs.fullFarm.fineRampStep = 5
+tabs.fullFarm.backoffStep = 25
 tabs.fullFarm.learnedLimit = false
 tabs.fullFarm.lastPingSampleAt = os.clock()
 tabs.fullFarm.lastPingSample = nil
 tabs.fullFarm.lastPingRise = 0
-tabs.fullFarm.stableInterval = 60
-tabs.fullFarm.stableStep = 2
+tabs.fullFarm.stableInterval = 30
+tabs.fullFarm.stableStep = 5
 tabs.fullFarm.stableSince = os.clock()
 tabs.fullFarm.pingPaused = false
 tabs.fullFarm.lastRampAt = os.clock()
@@ -696,12 +706,15 @@ end
 
 local function sendTrainingReps(state, rate, maxBurst, canSend)
     local now = os.clock()
-    local elapsed = math.clamp(now - (state.LastAt or now), 0, 0.1)
+    local elapsed = math.clamp(now - (state.LastAt or now), 0, 0.05)
     state.LastAt = now
-    state.Tokens = math.min(maxBurst, (state.Tokens or 0) + rate * elapsed)
+    local effectiveBurst = math.max(maxBurst, math.ceil(rate / 30))
+    state.Tokens = math.min(effectiveBurst, (state.Tokens or 0) + rate * elapsed)
     local sent = 0
     while state.Tokens >= 1 and canSend() do
-        utils.remotes.MuscleEvent:FireServer("rep")
+        pcall(function()
+            utils.remotes.MuscleEvent:FireServer("rep")
+        end)
         state.Tokens = state.Tokens - 1
         sent = sent + 1
     end
@@ -746,12 +759,17 @@ end
 
 tabs.fullFarm.updateStatus = function(ping)
     local tab = tabs.fullFarm
-    local pingText = ping and string.format(" | Ping: %.1f ms", ping) or " | Ping: unavailable"
+    if tab.directRunning then
+        tab.Status.Text = "Status: Farming (Direct) | " .. formatNumberSilence(tab.maxSendRate) .. " reps/s"
+        tab.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+        return
+    end
+    local pingText = ping and string.format(" | Ping: %.0f ms", ping) or " | Ping: N/A"
     if not tab.running then
         tab.Status.Text = (tab.gainedBaselineSet and "Status: Paused" or "Status: Inactive") .. pingText
         tab.Status.TextColor3 = tab.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
-    elseif tab.pingPaused or not ping or ping > tab.pingLimit then
-        tab.Status.Text = "Status: Waiting | " .. formatNumberSilence(tab.sendRate) .. " reps/s" .. pingText
+    elseif tab.pingPaused then
+        tab.Status.Text = "Status: Waiting (High Ping) | " .. formatNumberSilence(tab.sendRate) .. " reps/s" .. pingText
         tab.Status.TextColor3 = Color3.fromRGB(255, 180, 70)
     else
         tab.Status.Text = "Status: Farming | " .. formatNumberSilence(tab.sendRate) .. " reps/s" .. pingText
@@ -763,24 +781,30 @@ tabs.fullFarm.updateAdaptiveRate = function()
     local tab = tabs.fullFarm
     local now = os.clock()
     local ping = readDataPing()
-    tab.sendRate = math.min(tab.sendRate, tab.maxSendRate)
+    tab.sendRate = math.clamp(tab.sendRate, tab.minAdaptiveRate, tab.maxSendRate)
     
-    if ping and now - tab.lastPingSampleAt >= 0.5 then
-        tab.lastPingRise = tab.lastPingSample and ping - tab.lastPingSample or 0
+    if not ping then
+        tab.pingPaused = false
+        tab.updateStatus(nil)
+        return
+    end
+
+    if now - tab.lastPingSampleAt >= 0.5 then
+        tab.lastPingRise = tab.lastPingSample and (ping - tab.lastPingSample) or 0
         tab.lastPingSample = ping
         tab.lastPingSampleAt = now
     end
     
-    if not ping or ping > tab.pingLimit then
+    if ping > tab.pingLimit then
         if not tab.pingPaused then
-            tab.sendRate = math.max(math.min(tab.minAdaptiveRate, tab.sendRate), tab.sendRate - tab.backoffStep)
+            tab.sendRate = math.max(tab.minAdaptiveRate, tab.sendRate - tab.backoffStep)
             tab.learnedLimit = true
         end
         tab.pingPaused = true
         tab.stableSince = now
         tab.recoveryStartedAt = nil
     elseif tab.pingPaused then
-        if ping < tab.resumePing then
+        if ping <= tab.resumePing then
             tab.recoveryStartedAt = tab.recoveryStartedAt or now
             if now - tab.recoveryStartedAt >= tab.recoverySeconds then
                 tab.pingPaused = false
@@ -794,16 +818,14 @@ tabs.fullFarm.updateAdaptiveRate = function()
             tab.recoveryStartedAt = nil
         end
     elseif now - tab.lastRampAt >= tab.rampInterval then
-        local pressure = ping >= tab.resumePing or (ping >= 150 and tab.lastPingRise >= 20)
+        local pressure = ping >= tab.resumePing or (ping >= 180 and tab.lastPingRise >= 25)
         if pressure then
-            tab.sendRate = math.max(math.min(tab.minAdaptiveRate, tab.sendRate), tab.sendRate - tab.fineRampStep)
+            tab.sendRate = math.max(tab.minAdaptiveRate, tab.sendRate - tab.backoffStep)
             tab.learnedLimit = true
             tab.stableSince = now
-        elseif tab.sendRate < tab.minAdaptiveRate then
-            tab.sendRate = math.min(tab.minAdaptiveRate, tab.sendRate + tab.rampStep)
-            tab.stableSince = now
-        elseif not tab.learnedLimit then
-            tab.sendRate = math.min(tab.maxSendRate, tab.sendRate + tab.fineRampStep)
+        elseif tab.sendRate < tab.maxSendRate then
+            local step = tab.learnedLimit and tab.fineRampStep or tab.rampStep
+            tab.sendRate = math.min(tab.maxSendRate, tab.sendRate + step)
             tab.stableSince = now
         end
         tab.lastRampAt = now
@@ -816,10 +838,12 @@ tabs.fullFarm.updateAdaptiveRate = function()
     tab.updateStatus(ping)
 end
 
-tabs.fullFarm.workerLoop = function()
+tabs.fullFarm.workerLoop = function(gen)
     tabs.fullFarm.LastAt = os.clock()
-    local function isRunning() return tabs.fullFarm.running and not tabs.fullFarm.pingPaused and utils.isCurrent() end
-    while tabs.fullFarm.running and utils.isCurrent() do
+    local function isRunning()
+        return tabs.fullFarm.running and tabs.fullFarm.adaptiveRunning and tabs.fullFarm.workerGen == gen and not tabs.fullFarm.pingPaused and utils.isCurrent()
+    end
+    while tabs.fullFarm.running and tabs.fullFarm.adaptiveRunning and tabs.fullFarm.workerGen == gen and utils.isCurrent() do
         tabs.fullFarm.updateAdaptiveRate()
         tabs.fullFarm.startMeasurement()
         if not tabs.fullFarm.pingPaused then
@@ -827,16 +851,35 @@ tabs.fullFarm.workerLoop = function()
         end
         services.RunService.Heartbeat:Wait()
     end
-    tabs.fullFarm.workerActive = false
-    if tabs.fullFarm.running and utils.isCurrent() then
-        tabs.fullFarm.startWorker()
-    end
 end
 
 tabs.fullFarm.startWorker = function()
-    if tabs.fullFarm.workerActive then return end
-    tabs.fullFarm.workerActive = true
-    task.spawn(tabs.fullFarm.workerLoop)
+    tabs.fullFarm.workerGen = tabs.fullFarm.workerGen + 1
+    local gen = tabs.fullFarm.workerGen
+    task.spawn(function()
+        tabs.fullFarm.workerLoop(gen)
+    end)
+end
+
+tabs.fullFarm.workerLoopDirect = function(gen)
+    tabs.fullFarm.LastAt = os.clock()
+    local function isRunning()
+        return tabs.fullFarm.running and tabs.fullFarm.directRunning and tabs.fullFarm.workerGen == gen and utils.isCurrent()
+    end
+    while tabs.fullFarm.running and tabs.fullFarm.directRunning and tabs.fullFarm.workerGen == gen and utils.isCurrent() do
+        tabs.fullFarm.updateStatus(nil)
+        tabs.fullFarm.startMeasurement()
+        sendTrainingReps(tabs.fullFarm, tabs.fullFarm.maxSendRate, tabs.fullFarm.maxBurst, isRunning)
+        services.RunService.Heartbeat:Wait()
+    end
+end
+
+tabs.fullFarm.startDirectWorker = function()
+    tabs.fullFarm.workerGen = tabs.fullFarm.workerGen + 1
+    local gen = tabs.fullFarm.workerGen
+    task.spawn(function()
+        tabs.fullFarm.workerLoopDirect(gen)
+    end)
 end
 
 utils.connect(tabs.fullFarm.strength:GetPropertyChangedSignal("Value"), function()
@@ -850,58 +893,117 @@ utils.connect(tabs.fullFarm.durability:GetPropertyChangedSignal("Value"), functi
 end)
 
 tabs.fullFarm:AddLabel("FARM CONTROLS")
-tabs.fullFarm:AddTextBox("Max reps/s (Def: 480): ", function(inputText)
+tabs.fullFarm:AddTextBox("Max reps/s (Def: 400): ", function(inputText)
     local value = tonumber(inputText)
     if not value or value == math.huge or value == -math.huge then return end
     value = math.max(1, value)
     tabs.fullFarm.maxSendRate = value
     tabs.fullFarm.sendRate = math.min(tabs.fullFarm.sendRate, tabs.fullFarm.maxSendRate)
+    if tabs.fullFarm.directRunning then
+        tabs.fullFarm.updateStatus(nil)
+    end
 end, {clear = false})
 
 tabs.fullFarm:AddLabel("Auto Adaptive Ping Speed System is Active.")
 
 tabs.fullFarm.FastRepToggle = tabs.fullFarm:AddSwitch("Fast Rep (Adaptive)", function(state)
-    recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
-    recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
-    setTimerRunning(tabs.fullFarm, false)
-    tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
-    tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
-    tabs.fullFarm.running = state
-    tabs.fullFarm.Tokens = 0
+    tabs.fullFarm.adaptiveRunning = state
     if state then
+        if tabs.fullFarm.directRunning and tabs.fullFarm.FastRepDirectToggle then
+            tabs.fullFarm.switchingMode = true
+            tabs.fullFarm.FastRepDirectToggle:Set(false)
+            tabs.fullFarm.switchingMode = false
+        end
+        recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
+        recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
+        setTimerRunning(tabs.fullFarm, false)
+        tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
+        tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
+        tabs.fullFarm.running = true
+        tabs.fullFarm.Tokens = 0
         tabs.fullFarm.gainedBaselineSet = true
-        tabs.fullFarm.maxSendRate = tabs.fullFarm.maxSendRate or 480
+        tabs.fullFarm.maxSendRate = tabs.fullFarm.maxSendRate or 400
         tabs.fullFarm.learnedLimit = false
         tabs.fullFarm.lastPingSampleAt = os.clock()
         tabs.fullFarm.lastPingSample = nil
         tabs.fullFarm.lastPingRise = 0
-        tabs.fullFarm.sendRate = tabs.fullFarm.initialSendRate
+        tabs.fullFarm.sendRate = math.min(tabs.fullFarm.initialSendRate, tabs.fullFarm.maxSendRate)
         tabs.fullFarm.pingPaused = false
         tabs.fullFarm.recoveryStartedAt = nil
         tabs.fullFarm.LastAt = os.clock()
         tabs.fullFarm.lastRampAt = os.clock()
         tabs.fullFarm.stableSince = os.clock()
         
-        tabs.fullFarm.Status.Text = "Status: Preparing | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
+        tabs.fullFarm.Status.Text = "Status: Farming | " .. formatNumberSilence(tabs.fullFarm.sendRate) .. " reps/s"
         tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
         tabs.fullFarm.startWorker()
     else
-        tabs.fullFarm.Status.Text = tabs.fullFarm.gainedBaselineSet and "Status: Paused" or "Status: Inactive"
-        tabs.fullFarm.Status.TextColor3 = tabs.fullFarm.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
-        tabs.fullFarm.updateRuntime()
+        if not tabs.fullFarm.switchingMode then
+            recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
+            recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
+            setTimerRunning(tabs.fullFarm, false)
+            tabs.fullFarm.running = false
+            tabs.fullFarm.Tokens = 0
+            tabs.fullFarm.workerGen = tabs.fullFarm.workerGen + 1
+            tabs.fullFarm.Status.Text = tabs.fullFarm.gainedBaselineSet and "Status: Paused" or "Status: Inactive"
+            tabs.fullFarm.Status.TextColor3 = tabs.fullFarm.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
+            tabs.fullFarm.updateRuntime()
+        end
     end
     tabs.fullFarm.updateStats()
-    tabs.fullFarm.updateStatus(readDataPing())
+    if not tabs.fullFarm.directRunning then
+        tabs.fullFarm.updateStatus(readDataPing())
+    end
 end)
 tabs.fullFarm.FastRepToggle:Set(false)
 
+tabs.fullFarm.FastRepDirectToggle = tabs.fullFarm:AddSwitch("Fast Rep (Direct)", function(state)
+    tabs.fullFarm.directRunning = state
+    if state then
+        if tabs.fullFarm.adaptiveRunning and tabs.fullFarm.FastRepToggle then
+            tabs.fullFarm.switchingMode = true
+            tabs.fullFarm.FastRepToggle:Set(false)
+            tabs.fullFarm.switchingMode = false
+        end
+        recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
+        recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
+        setTimerRunning(tabs.fullFarm, false)
+        tabs.fullFarm.statSamples.Strength = tabs.fullFarm.strength.Value
+        tabs.fullFarm.statSamples.Durability = tabs.fullFarm.durability.Value
+        tabs.fullFarm.running = true
+        tabs.fullFarm.Tokens = 0
+        tabs.fullFarm.pingPaused = false
+        tabs.fullFarm.gainedBaselineSet = true
+        tabs.fullFarm.maxSendRate = tabs.fullFarm.maxSendRate or 400
+        tabs.fullFarm.LastAt = os.clock()
+
+        tabs.fullFarm.Status.Text = "Status: Farming (Direct) | " .. formatNumberSilence(tabs.fullFarm.maxSendRate) .. " reps/s"
+        tabs.fullFarm.Status.TextColor3 = Color3.fromRGB(80, 255, 120)
+        tabs.fullFarm.startDirectWorker()
+    else
+        if not tabs.fullFarm.switchingMode then
+            recordStatGain(tabs.fullFarm, "Strength", tabs.fullFarm.strength.Value)
+            recordStatGain(tabs.fullFarm, "Durability", tabs.fullFarm.durability.Value)
+            setTimerRunning(tabs.fullFarm, false)
+            tabs.fullFarm.running = false
+            tabs.fullFarm.Tokens = 0
+            tabs.fullFarm.workerGen = tabs.fullFarm.workerGen + 1
+            tabs.fullFarm.Status.Text = tabs.fullFarm.gainedBaselineSet and "Status: Paused" or "Status: Inactive"
+            tabs.fullFarm.Status.TextColor3 = tabs.fullFarm.gainedBaselineSet and Color3.fromRGB(255, 180, 70) or Color3.fromRGB(255, 80, 80)
+            tabs.fullFarm.updateRuntime()
+            tabs.fullFarm.updateStatus(readDataPing())
+        end
+    end
+    tabs.fullFarm.updateStats()
+end)
+tabs.fullFarm.FastRepDirectToggle:Set(false)
+
 task.spawn(function()
     while utils.isCurrent() do
-        local ping = readDataPing()
         if not tabs.fullFarm.running then
-            tabs.fullFarm.updateStatus(ping)
+            tabs.fullFarm.updateStatus(readDataPing())
         end
-        task.wait(0.25)
+        task.wait(0.5)
     end
 end)
 
@@ -912,7 +1014,7 @@ task.spawn(function()
             tabs.fullFarm.updateAverage()
             tabs.fullFarm.nextAverageElapsed = getElapsed(tabs.fullFarm) + 5
         end
-        task.wait(0.05)
+        task.wait(0.1)
     end
 end)
 
@@ -1359,8 +1461,8 @@ end):Set(false)
 
 tabs.configs:AddLabel("ZONE REBIRTH")
 tabs.configs:AddSwitch("Auto Rebirth (Zones)", function(state)
-    if tabs.fullRebirth and tabs.fullRebirth.FastRebirthV2Toggle then
-        tabs.fullRebirth.FastRebirthV2Toggle:Set(state)
+    if autoRebirthToggleRef and autoRebirthToggleRef.Set then
+        autoRebirthToggleRef:Set(state)
     end
 end):Set(false)
 
@@ -2015,7 +2117,6 @@ local dummyLabelForParent = tabs.pets:AddLabel("PET PROGRESS TRACKER")
 tabs.pets.SelectedDisplay = nil
 tabs.pets.PetMap = {}
 
--- UI de la Barra Visual (Estilo Muscle Legends)
 local trackerContainer = Instance.new("Frame")
 trackerContainer.Name = "PetTrackerContainer"
 trackerContainer.Size = UDim2.new(0.9, 0, 0, 60)
