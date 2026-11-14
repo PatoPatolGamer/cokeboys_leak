@@ -1476,15 +1476,50 @@ tabs.boss.NormalData = {
     NormalBosses = {}
 }
 
-tabs.boss.HalloweenData = {
+tabs.boss.AlienBossData = {
     Running = false,
     Generation = 0,
-    TargetBoss = "Todos",
-    HitInterval = 0.01,
-    HalloweenBosses = {}
+    HitInterval = 0.01
 }
 
-local halloweenBossNames = {"Frankenbrute", "Scarecrow Colossus", "Grim Reaper", "Pumpkin Titan"}
+local function getAlienGymMap()
+    local alienGym = services.Workspace:FindFirstChild("AlienGym")
+    return alienGym and alienGym:FindFirstChild("Map")
+end
+
+local function getAlienBossArena()
+    local map = getAlienGymMap()
+    return map and map:FindFirstChild("AlienBossArena")
+end
+
+local function getAlienBossSpawn()
+    local map = getAlienGymMap()
+    if not map then return nil end
+    return map:FindFirstChild("AlienBossSpawn") or map:FindFirstChild("AlienBossSpawn", true)
+end
+
+local function getAlienRespawnText()
+    local map = getAlienGymMap()
+    if not map then return nil end
+    local respawnObj = map:FindFirstChild("alienBossRespawn", true)
+    if not respawnObj then return nil end
+    if respawnObj:IsA("ValueBase") then
+        return tostring(respawnObj.Value)
+    elseif respawnObj:IsA("TextLabel") or respawnObj:IsA("TextBox") then
+        return respawnObj.Text
+    else
+        local lbl = respawnObj:FindFirstChildWhichIsA("TextLabel", true)
+        if lbl and lbl.Text ~= "" then
+            return lbl.Text
+        end
+    end
+    return nil
+end
+
+local function getEventsBossArena()
+    local events = services.Workspace:FindFirstChild("Events")
+    return events and events:FindFirstChild("BossArena")
+end
 
 tabs.boss:AddLabel("AUTO CHEST SYSTEM")
 tabs.boss.AutoChestData = { Running = false }
@@ -1539,10 +1574,30 @@ tabs.boss.HealthLabel = tabs.boss:AddLabel("Health: 0 / 0")
 tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
 
 tabs.boss.getBossData = function(bossModel)
-    local stats = bossModel:FindFirstChild("stats")
-    local health = (stats and stats:FindFirstChild("Health") and stats.Health.Value) or bossModel:GetAttribute("BossHealth") or bossModel:GetAttribute("Health")
-    local maxHealth = (stats and stats:FindFirstChild("MaxHealth") and stats.MaxHealth.Value) or bossModel:GetAttribute("BossMaxHealth") or bossModel:GetAttribute("MaxHealth")
-    local hitbox = bossModel:FindFirstChild("BossDamageHitbox", true) or bossModel:FindFirstChild("HumanoidRootPart") or bossModel:FindFirstChild("PrimaryPart")
+    local subBoss = bossModel:FindFirstChild("Boss")
+    local stats = bossModel:FindFirstChild("stats") or (subBoss and subBoss:FindFirstChild("stats"))
+    local hum = bossModel:FindFirstChildOfClass("Humanoid") or (subBoss and subBoss:FindFirstChildOfClass("Humanoid"))
+    
+    local health = (stats and stats:FindFirstChild("Health") and stats.Health.Value)
+        or bossModel:GetAttribute("BossHealth")
+        or bossModel:GetAttribute("Health")
+        or (subBoss and (subBoss:GetAttribute("BossHealth") or subBoss:GetAttribute("Health")))
+        or (hum and hum.Health)
+        
+    local maxHealth = (stats and stats:FindFirstChild("MaxHealth") and stats.MaxHealth.Value)
+        or bossModel:GetAttribute("BossMaxHealth")
+        or bossModel:GetAttribute("MaxHealth")
+        or (subBoss and (subBoss:GetAttribute("BossMaxHealth") or subBoss:GetAttribute("MaxHealth")))
+        or (hum and hum.MaxHealth)
+        
+    local hitbox = bossModel:FindFirstChild("BossDamageHitbox", true)
+        or (subBoss and (subBoss:FindFirstChild("HumanoidRootPart") or subBoss:FindFirstChild("UpperTorso") or subBoss:FindFirstChild("Torso") or subBoss.PrimaryPart))
+        or bossModel:FindFirstChild("HumanoidRootPart")
+        or bossModel:FindFirstChild("UpperTorso")
+        or bossModel:FindFirstChild("Torso")
+        or bossModel.PrimaryPart
+        or bossModel:FindFirstChildWhichIsA("BasePart", true)
+        
     return health, maxHealth, hitbox
 end
 
@@ -1557,7 +1612,7 @@ tabs.boss.findNormalBoss = function()
             if hitbox then return candidate, bossName, health, maxHealth, hitbox end
         end
     end
-    local arena = services.Workspace:FindFirstChild("Events") and services.Workspace.Events:FindFirstChild("BossArena")
+    local arena = getEventsBossArena()
     if arena then
         for _, candidate in ipairs(arena:GetChildren()) do
             if candidate:IsA("Model") then
@@ -1690,162 +1745,230 @@ tabs.boss.NormalBossToggle = tabs.boss:AddSwitch("Auto Farm Normal Boss", functi
     end)
 end)
 
-for _, name in ipairs(halloweenBossNames) do
-    tabs.boss.HalloweenData.HalloweenBosses[name] = true
+-- ==========================================
+-- ALIEN BOSS (EXCLUSIVO ALIEN GYM)
+-- ==========================================
+tabs.boss:AddLabel("ALIEN BOSS (ONLY ALIEN)")
+
+tabs.boss.findAlienBoss = function()
+    local directBoss = services.Workspace:FindFirstChild("Alien Boss")
+    if directBoss and directBoss:IsA("Model") then
+        local bossName = directBoss:GetAttribute("BossDisplayName") or directBoss.Name
+        local health, maxHealth, hitbox = tabs.boss.getBossData(directBoss)
+        if hitbox and (not health or health > 0) then
+            return directBoss, bossName, health, maxHealth, hitbox
+        end
+    end
+
+    local alienArena = getAlienBossArena()
+    if alienArena then
+        local explicitBoss = alienArena:FindFirstChild("Alien Boss") or alienArena:FindFirstChild("AlienBoss")
+        if explicitBoss and explicitBoss:IsA("Model") then
+            local bossName = explicitBoss:GetAttribute("BossDisplayName") or explicitBoss.Name
+            local health, maxHealth, hitbox = tabs.boss.getBossData(explicitBoss)
+            if hitbox and (not health or health > 0) then
+                return explicitBoss, bossName, health, maxHealth, hitbox
+            end
+        end
+    end
+
+    return nil
 end
 
--- ==========================================
--- HALLOWEEN BOSSES (OCULTOS TEMPORALMENTE)
--- ==========================================
-local MOSTRAR_HALLOWEEN_BOSSES = false 
+tabs.boss.AlienBossToggle = tabs.boss:AddSwitch("Auto Farm Alien Boss", function(state)
+    tabs.boss.AlienBossData.Running = state
+    tabs.boss.AlienBossData.Generation = tabs.boss.AlienBossData.Generation + 1
+    local gen = tabs.boss.AlienBossData.Generation
 
-if MOSTRAR_HALLOWEEN_BOSSES then
-    tabs.boss:AddLabel("HALLOWEEN BOSSES")
-
-    tabs.boss.findHalloweenBoss = function()
-        for _, bossName in ipairs(halloweenBossNames) do
-            if tabs.boss.HalloweenData.TargetBoss == "Todos" or tabs.boss.HalloweenData.TargetBoss == bossName then
-                local candidate = services.Workspace:FindFirstChild(bossName)
-                if candidate and candidate:IsA("Model") then
-                    local health, maxHealth, hitbox = tabs.boss.getBossData(candidate)
-                    if hitbox then return candidate, bossName, health, maxHealth, hitbox end
-                end
-            end
+    pcall(function()
+        if utils.remotes.ChangeSpeedSize then
+            local targetSize = state and 5 or 2
+            utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", targetSize)
         end
-        return nil
-    end
-
-    tabs.boss.HalloweenDropdown = tabs.boss:AddDropdown("Select Halloween Boss", function(selectedName)
-        if selectedName ~= "" then tabs.boss.HalloweenData.TargetBoss = selectedName end
     end)
-    tabs.boss.HalloweenDropdown:Add("Todos")
-    for _, name in ipairs(halloweenBossNames) do
-        tabs.boss.HalloweenDropdown:Add(name)
+
+    if not state then
+        tabs.boss.StatusLabel.Text = "Status: Inactive"
+        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+        tabs.boss.BossLabel.Text = "Boss: None"
+        tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+        return
     end
 
-    tabs.boss.HalloweenBossToggle = tabs.boss:AddSwitch("Auto Farm Halloween Boss", function(state)
-        tabs.boss.HalloweenData.Running = state
-        tabs.boss.HalloweenData.Generation = tabs.boss.HalloweenData.Generation + 1
-        local gen = tabs.boss.HalloweenData.Generation
-        
-        pcall(function()
-            if utils.remotes.ChangeSpeedSize then
-                local targetSize = state and 5 or 2
-                utils.remotes.ChangeSpeedSize:InvokeServer("changeSize", targetSize)
-            end
-        end)
+    task.spawn(function()
+        local bossExisted = false
+        while utils.isCurrent() and tabs.boss.AlienBossData.Running and tabs.boss.AlienBossData.Generation == gen do
+            local killed = false
+            pcall(function()
+                local model, bossName, health, maxHealth, hitbox = tabs.boss.findAlienBoss()
+                if model and hitbox then
+                    bossExisted = true
 
-        if not state then
-            tabs.boss.StatusLabel.Text = "Status: Inactive"
-            tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
-            tabs.boss.BossLabel.Text = "Boss: None"
-            tabs.boss.HealthLabel.Text = "Health: 0 / 0"
-            return
-        end
-
-        task.spawn(function()
-            local bossExisted = false
-            while utils.isCurrent() and tabs.boss.HalloweenData.Running and tabs.boss.HalloweenData.Generation == gen do
-                local killed = false
-                pcall(function()
-                    local model, bossName, health, maxHealth, hitbox = tabs.boss.findHalloweenBoss()
-                    if model and hitbox then
-                        bossExisted = true
-                        
-                        if health and health <= 0 then
-                            killed = true
+                    if health and health <= 0 then
+                        killed = true
+                    else
+                        tabs.boss.StatusLabel.Text = "Status: Fighting Alien Boss"
+                        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
+                        tabs.boss.BossLabel.Text = "Boss: " .. tostring(bossName)
+                        if health and maxHealth then
+                            tabs.boss.HealthLabel.Text = "Health: " .. formatNumberSilence(health) .. " / " .. formatNumberSilence(maxHealth)
                         else
-                            tabs.boss.StatusLabel.Text = "Status: Fighting Halloween Boss"
-                            tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(80, 255, 120)
-                            tabs.boss.BossLabel.Text = "Boss: " .. bossName
-                            if health and maxHealth then
-                                tabs.boss.HealthLabel.Text = "Health: " .. formatNumberSilence(health) .. " / " .. formatNumberSilence(maxHealth)
-                            else
-                                tabs.boss.HealthLabel.Text = "Health: Active"
-                            end
+                            tabs.boss.HealthLabel.Text = "Health: Active"
+                        end
 
-                            hitbox.Size = Vector3.new(60, 120, 60)
-                            hitbox.Transparency = 1
-                            hitbox.CanCollide = false
-                            local char = lp.player.Character
-                            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                            local punch = char and char:FindFirstChild("Punch") or utils.playerData.Backpack:FindFirstChild("Punch")
-                            
-                            if hrp then
-                                if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
-                                local alturaDinamica = (hitbox.Size.Y / 2) + 15
-                                
-                                local velocidadOrbita = tick() * 3
-                                local radioEvasion = 12
-                                local offsetX = math.cos(velocidadOrbita) * radioEvasion
-                                local offsetZ = math.sin(velocidadOrbita) * radioEvasion
-                                local offsetSeguro = Vector3.new(offsetX, alturaDinamica, offsetZ)
-                                
-                                hrp.CFrame = CFrame.lookAt(hitbox.Position + offsetSeguro, hitbox.Position)
-                                hrp.AssemblyLinearVelocity = Vector3.zero
-                                
-                                if utils.remotes.MuscleEvent then
-                                    utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
-                                    utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
-                                end
-                                if punch then punch:Activate() end
+                        local expandedSize = Vector3.new(100, 140, 100)
+                        hitbox.Size = expandedSize
+                        hitbox.Transparency = 1
+                        hitbox.CanCollide = false
+                        hitbox.Massless = true
+
+                        for _, partName in ipairs({"BossDamageHitbox", "HumanoidRootPart", "UpperTorso", "Torso"}) do
+                            local extraPart = model:FindFirstChild(partName, true)
+                            if extraPart and extraPart:IsA("BasePart") then
+                                extraPart.Size = expandedSize
+                                extraPart.Transparency = 1
+                                extraPart.CanCollide = false
+                                extraPart.Massless = true
                             end
                         end
+
+                        local char = lp.player.Character
+                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                        local punch = char and char:FindFirstChild("Punch") or utils.playerData.Backpack:FindFirstChild("Punch")
+
+                        if hrp then
+                            if punch and punch.Parent ~= char then char.Humanoid:EquipTool(punch) end
+                            local alturaDinamica = (hitbox.Size.Y / 2) - 5
+
+                            local velocidadOrbita = tick() * 3
+                            local radioEvasion = 12
+                            local offsetX = math.cos(velocidadOrbita) * radioEvasion
+                            local offsetZ = math.sin(velocidadOrbita) * radioEvasion
+                            local offsetSeguro = Vector3.new(offsetX, alturaDinamica, offsetZ)
+
+                            hrp.CFrame = CFrame.lookAt(hitbox.Position + offsetSeguro, hitbox.Position)
+                            hrp.AssemblyLinearVelocity = Vector3.zero
+
+                            if firetouchinterest then
+                                local rightHand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+                                local leftHand = char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm")
+                                if rightHand then
+                                    firetouchinterest(hitbox, rightHand, 0)
+                                    firetouchinterest(hitbox, rightHand, 1)
+                                end
+                                if leftHand then
+                                    firetouchinterest(hitbox, leftHand, 0)
+                                    firetouchinterest(hitbox, leftHand, 1)
+                                end
+                            end
+
+                            if utils.remotes.MuscleEvent then
+                                utils.remotes.MuscleEvent:FireServer("punch", "leftHand")
+                                utils.remotes.MuscleEvent:FireServer("punch", "rightHand")
+                            end
+                            if punch then punch:Activate() end
+                        end
+                    end
+                else
+                    if bossExisted then
+                        killed = true
                     else
-                        if bossExisted then
-                            killed = true
+                        local respawnInfo = getAlienRespawnText()
+                        if respawnInfo and respawnInfo ~= "" then
+                            tabs.boss.StatusLabel.Text = "Status: Waiting (" .. respawnInfo .. ")"
                         else
-                            tabs.boss.StatusLabel.Text = "Status: Waiting Halloween Boss"
-                            tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
-                            tabs.boss.BossLabel.Text = "Boss: None"
-                            tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+                            tabs.boss.StatusLabel.Text = "Status: Waiting Alien Boss"
+                        end
+                        tabs.boss.StatusLabel.TextColor3 = Color3.fromRGB(255, 200, 80)
+                        tabs.boss.BossLabel.Text = "Boss: None"
+                        tabs.boss.HealthLabel.Text = "Health: 0 / 0"
+                    end
+                end
+            end)
+
+            if killed then
+                if tabs.boss.AlienBossToggle and tabs.boss.AlienBossToggle.Set then
+                    tabs.boss.AlienBossToggle:Set(false)
+                else
+                    tabs.boss.AlienBossData.Running = false
+                end
+
+                task.wait(1.5)
+
+                pcall(function()
+                    local char = lp.player.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    local alienSpawn = getAlienBossSpawn()
+                    local alienArena = getAlienBossArena()
+                    local spawnPos = nil
+
+                    if hrp and alienSpawn then
+                        local spawnCFrame = alienSpawn:IsA("BasePart") and alienSpawn.CFrame or alienSpawn:GetPivot()
+                        spawnPos = spawnCFrame.Position
+                        hrp.CFrame = spawnCFrame * CFrame.new(0, 3, 0)
+                        hrp.AssemblyLinearVelocity = Vector3.zero
+                        task.wait(0.3)
+                    end
+
+                    local searchContainers = {}
+                    if alienArena then table.insert(searchContainers, alienArena) end
+                    if alienSpawn then table.insert(searchContainers, alienSpawn) end
+                    local map = getAlienGymMap()
+                    if map then table.insert(searchContainers, map) end
+
+                    local triggered = {}
+                    for _, container in ipairs(searchContainers) do
+                        for _, desc in ipairs(container:GetDescendants()) do
+                            if not triggered[desc] then
+                                if desc:IsA("ProximityPrompt") then
+                                    local part = desc.Parent
+                                    local isNear = (container ~= map) or (spawnPos and part and part:IsA("BasePart") and (part.Position - spawnPos).Magnitude <= 120)
+                                    if isNear then
+                                        triggered[desc] = true
+                                        if fireproximityprompt then
+                                            fireproximityprompt(desc, 1)
+                                        else
+                                            desc.HoldDuration = 0
+                                            desc:InputHoldBegin()
+                                            task.wait(0.1)
+                                            desc:InputHoldEnd()
+                                        end
+                                    end
+                                elseif desc:IsA("TouchTransmitter") and desc.Parent and hrp then
+                                    local part = desc.Parent
+                                    local isNear = (container ~= map) or (spawnPos and part and part:IsA("BasePart") and (part.Position - spawnPos).Magnitude <= 120)
+                                    if isNear then
+                                        triggered[desc] = true
+                                        firetouchinterest(part, hrp, 0)
+                                        firetouchinterest(part, hrp, 1)
+                                    end
+                                end
+                            end
                         end
                     end
                 end)
 
-                if killed then
-                    if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
-                        tabs.boss.HalloweenBossToggle:Set(false)
-                    else
-                        tabs.boss.HalloweenData.Running = false
-                    end
-                    
-                    task.wait(5)
-
-                    pcall(function()
-                        local char = lp.player.Character
-                        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                        if hrp then
-                            hrp.CFrame = CFrame.new(Vector3.new(5421, 86, 6261))
-                            hrp.AssemblyLinearVelocity = Vector3.zero
-                            task.wait(0.4)
-                        end
-                        
-                        local Event = game:GetService("ReplicatedStorage").rEvents.halloweenWheelRemote
-                        Event:InvokeServer("spin")
-                    end)
-
-                    task.wait(2)
-                    if tabs.boss.HalloweenBossToggle and tabs.boss.HalloweenBossToggle.Set then
-                        tabs.boss.HalloweenBossToggle:Set(true)
-                    end
-                    
-                    break
+                task.wait(2)
+                if tabs.boss.AlienBossToggle and tabs.boss.AlienBossToggle.Set then
+                    tabs.boss.AlienBossToggle:Set(true)
                 end
 
-                task.wait(tabs.boss.HalloweenData.HitInterval)
+                break
             end
-        end)
+
+            task.wait(tabs.boss.AlienBossData.HitInterval)
+        end
     end)
-end
--- ==========================================
+end)
 
 pcall(function()
     if utils.remotes.GuiDamageEvent then
         utils.connect(utils.remotes.GuiDamageEvent.OnClientEvent, function(action, _, damage, targetModel, _)
             if action == "bossPlayerDamageShow" and targetModel then
-                local isHalloweenBoss = tabs.boss.HalloweenData.HalloweenBosses[targetModel.Name]
-                if isHalloweenBoss or tabs.boss.NormalData.NormalBosses[targetModel.Name] then
+                local alienArena = getAlienBossArena()
+                local isAlienBoss = (targetModel.Name == "Alien Boss" or targetModel.Name == "AlienBoss")
+                    or (alienArena and targetModel:IsDescendantOf(alienArena))
+                if isAlienBoss or tabs.boss.NormalData.NormalBosses[targetModel.Name] then
                     if damage then tabs.boss.HealthLabel.Text = "Last Damage: " .. formatNumberSilence(damage) end
                 end
             end
